@@ -60,12 +60,13 @@ graph TD
 ### 2.2 Frontend (React + MUI + TypeScript)
 
 - **App Shell (`src/client/App.tsx`)**: Sets up MUI Theme (dark/high-contrast fire station aesthetic), notifications/toast context, and navigation between Public Dashboard and Admin Management.
-- **Public Dashboard (`src/client/components/Dashboard.tsx`)**:
-  - Periodic polling (every 2s) against `/api/state`.
+- **Public Dashboard (`src/client/components/dashboard/Dashboard.tsx`)**:
+  - Periodic polling (every 2s, `useAppState`) against `/api/state`; keeps the last known state and shows a German connection warning on failure.
+  - Always-mounted `role="status"` / `aria-live="polite"` region announces alert and truck changes (R1a); highlighted trucks also carry an "Alarmiert" chip (not colour-only).
   - **Idle State**: Displays prominent "Einsatzmonitor" banner and responsive grid of all fire trucks (unhighlighted).
   - **Active Alert State**: Displays category, address, info, and optional notes; highlights participating fire trucks in warning accent color.
   - **False Alarm State**: Displays "Fehlalarm" banner with unhighlighted truck grid.
-  - **Sound Controller (`src/client/components/SoundPlayer.tsx`)**: Plays looped `Warnung.mp3` for configured duration upon alert transition; respects per-device "Ton" toggle stored in `localStorage`.
+  - **Sound (`src/client/hooks/useAlarmSound.ts` + `SoundToggle.tsx`)**: Plays looped `/sound/Warnung.mp3` for `soundDurationSec` when an alert (or false alarm) is active and the per-device "Ton" toggle is on (`localStorage` key `bft.soundEnabled`, default off). Stops on alarm end, duration expiry, or toggle off. Rejected `play()` (autoplay policy) is ignored; the toggle click is the user gesture.
 - **Admin Interface (`src/client/components/admin/`)**:
   - `TruckManager.tsx`: List, create, edit, and delete trucks.
   - `AlertManager.tsx`: List, create, edit, delete planned alerts, and view status badges.
@@ -219,13 +220,14 @@ bft/
 │       ├── theme.ts          # MUI Fire Station Dark/High-Contrast Theme
 │       ├── api/              # Client API client with Basic Auth header injection
 │       │   └── client.ts
-│       ├── hooks/            # Custom React hooks (usePollingState, useAudio)
+│       ├── hooks/            # Custom React hooks (polling state, alarm audio)
 │       │   ├── useAppState.ts
 │       │   └── useAlarmSound.ts
 │       └── components/
 │           ├── common/       # Shared UI widgets (Header, Toast, ConfirmDialog)
 │           ├── dashboard/    # Einsatzmonitor view, TruckGrid, AlertDisplay
 │           │   ├── Dashboard.tsx
+│           │   ├── TruckGrid.tsx
 │           │   ├── TruckCard.tsx
 │           │   └── SoundToggle.tsx
 │           └── admin/        # Protected admin management views
@@ -235,6 +237,8 @@ bft/
 │               ├── TriggerDialog.tsx
 │               └── SettingsCard.tsx
 └── tests/
+    ├── setup.ts              # jest-dom matchers + localStorage shim for jsdom
+    ├── client/               # jsdom component/hook tests (dashboard, useAppState, useAlarmSound)
     ├── unit/
     │   ├── storage.test.ts   # Persistence & seeding tests
     │   ├── engine.test.ts    # Domain logic & timer tests

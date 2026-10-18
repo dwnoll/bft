@@ -370,7 +370,7 @@ sequenceDiagram
 
 ---
 
-- [ ] **Unit 4: Public Station Dashboard & Audio Engine (React + MUI)**
+- [x] **Unit 4: Public Station Dashboard & Audio Engine (React + MUI)**
 
 **Goal:** Build the responsive public dashboard view ("Einsatzmonitor") with 2-second polling, responsive truck card grid, active alert banners, screen reader accessibility, and looped audio playback with per-device "Ton" toggle.
 
@@ -511,9 +511,9 @@ Tracking the Compound Engineering cycle for Firealarm Simulator:
 - [x] **Phase 1: Architecture Design & System Specification** (Completed in `docs/architecture.md`)
 - [x] **Phase 2: Implementation Planning** (Completed in `docs/plans/2026-10-18-001-feat-firealarm-simulator-web-app-plan.md`)
 - [ ] **Phase 3: Execution (ce-work)**
-  - [ ] Unit 1: Project Scaffolding, TypeScript Configuration, Core Domain Types & Atomic Storage
-  - [ ] Unit 2: Alert Lifecycle Engine, Timer Tick Loop & Pure Domain Logic
-  - [ ] Unit 3: Express Backend API & Basic Authentication
+  - [x] Unit 1: Project Scaffolding, TypeScript Configuration, Core Domain Types & Atomic Storage
+  - [x] Unit 2: Alert Lifecycle Engine, Timer Tick Loop & Pure Domain Logic
+  - [x] Unit 3: Express Backend API & Basic Authentication
   - [ ] Unit 4: Public Station Dashboard & Audio Engine
   - [ ] Unit 5: Admin Panel (Truck CRUD, Alert CRUD, Delayed Trigger Dialog & Controls)
   - [ ] Unit 6: Production Build, Audio Asset Pipeline, End-to-End Verification & Documentation
