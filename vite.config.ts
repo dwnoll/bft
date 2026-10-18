@@ -16,6 +16,9 @@ export default defineConfig({
       },
     },
   },
+  // `public/` (incl. public/sound/Warnung.mp3) is copied verbatim into
+  // dist/client, so the audio is served at /sound/Warnung.mp3 (PRD §9).
+  publicDir: 'public',
   build: {
     outDir: 'dist/client',
     emptyOutDir: true,

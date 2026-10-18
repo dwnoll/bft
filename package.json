@@ -5,9 +5,10 @@
   "description": "Fire station alarm drill simulator (Einsatzmonitor) with an Express JSON API and a React/MUI dashboard.",
   "scripts": {
     "dev": "concurrently \"tsx watch src/server/index.ts\" \"vite\"",
-    "build": "vite build && tsc -p tsconfig.server.json && node -e \"fs.cpSync('docs/Warnung.mp3','dist/client/sound/Warnung.mp3',{recursive:true,force:true})\"",
-    "start": "node dist/server/index.js",
-    "test": "vitest run"
+    "build": "tsc -p tsconfig.client.json && vite build && tsc -p tsconfig.server.json",
+    "start": "node dist/server/server/index.js",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
@@ -29,6 +30,7 @@
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^4.3.4",
+    "@vitest/coverage-v8": "^2.1.9",
     "concurrently": "^8.2.2",
     "jsdom": "^25.0.1",
     "tsx": "^4.19.2",

@@ -469,7 +469,7 @@ sequenceDiagram
 
 ---
 
-- [ ] **Unit 6: Production Build, Audio Asset Pipeline, End-to-End Verification & Documentation**
+- [x] **Unit 6: Production Build, Audio Asset Pipeline, End-to-End Verification & Documentation**
 
 **Goal:** Wire the build pipeline (Vite build, copying `Warnung.mp3` to production public assets), verify single-port production serving, execute full test suite with ≥80% coverage, and validate compliance against all PRD requirements.
 
@@ -510,13 +510,13 @@ Tracking the Compound Engineering cycle for Firealarm Simulator:
 - [x] **Phase 0: Problem Framing & Scope Definition** (Completed in `docs/brainstorms/2026-10-17-firealarm-simulator-requirements.md` & `docs/PRD.md`)
 - [x] **Phase 1: Architecture Design & System Specification** (Completed in `docs/architecture.md`)
 - [x] **Phase 2: Implementation Planning** (Completed in `docs/plans/2026-10-18-001-feat-firealarm-simulator-web-app-plan.md`)
-- [ ] **Phase 3: Execution (ce-work)**
+- [x] **Phase 3: Execution (ce-work)**
   - [x] Unit 1: Project Scaffolding, TypeScript Configuration, Core Domain Types & Atomic Storage
   - [x] Unit 2: Alert Lifecycle Engine, Timer Tick Loop & Pure Domain Logic
   - [x] Unit 3: Express Backend API & Basic Authentication
   - [x] Unit 4: Public Station Dashboard & Audio Engine
   - [x] Unit 5: Admin Panel (Truck CRUD, Alert CRUD, Delayed Trigger Dialog & Controls)
-  - [ ] Unit 6: Production Build, Audio Asset Pipeline, End-to-End Verification & Documentation
+  - [x] Unit 6: Production Build, Audio Asset Pipeline, End-to-End Verification & Documentation
 - [ ] **Phase 4: Code Review & Quality Audit (ce-review)**
 - [ ] **Phase 5: Release & Verification**
 

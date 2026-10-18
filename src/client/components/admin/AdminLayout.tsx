@@ -23,13 +23,11 @@ import { TruckManager } from './TruckManager'
 export interface AdminLayoutProps {
   isAuthenticated?: boolean
   onAuthenticatedChange?: (auth: boolean) => void
-  onLogout?: () => void
 }
 
 export function AdminLayout({
   isAuthenticated: propIsAuthenticated,
   onAuthenticatedChange,
-  onLogout,
 }: AdminLayoutProps) {
   const { showSuccess, showError } = useToast()
 
@@ -52,7 +50,7 @@ export function AdminLayout({
   const [trucks, setTrucks] = useState<Truck[]>([])
   const [alerts, setAlerts] = useState<AlertType[]>([])
   const [settings, setSettings] = useState<Settings>({ soundDurationSec: 60 })
-  const [loading, setLoading] = useState(false)
+  const [loading] = useState(false)
   const [tabIndex, setTabIndex] = useState(0)
 
   // False Alarm Trigger State

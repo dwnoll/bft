@@ -3,3 +3,4 @@ dist/
 data.json
 data.json.tmp.*
 *.log
+coverage/

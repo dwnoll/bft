@@ -178,7 +178,37 @@ sequenceDiagram
 
 ---
 
-## 6. Directory & Code Organization
+## 6. Build, Asset Pipeline & Deployment
+
+```mermaid
+flowchart LR
+    subgraph Build["npm run build"]
+        TSC1["tsc -p tsconfig.client.json<br/>(typecheck only)"] --> VITE["vite build"]
+        VITE --> TSC2["tsc -p tsconfig.server.json"]
+    end
+    PUB["public/sound/Warnung.mp3"] -->|copied verbatim by Vite| CLIENT
+    VITE --> CLIENT["dist/client/<br/>index.html, assets/, sound/Warnung.mp3"]
+    TSC2 --> SERVER["dist/server/server/index.js<br/>dist/server/shared/*"]
+    SERVER -->|npm start, single port 3000| RUNTIME(("Express"))
+    CLIENT -->|express.static + SPA fallback| RUNTIME
+```
+
+- **Client typecheck**: Vite does not typecheck, so `npm run build` runs `tsc -p tsconfig.client.json` first; type errors fail the build.
+- **Audio asset**: `public/sound/Warnung.mp3` is the single source (identical to `docs/Warnung.mp3`). Vite copies `public/` into `dist/client`, so the runtime URL is `/sound/Warnung.mp3`.
+- **Server output**: `rootDir` is `src` (so `src/shared` is compiled alongside `src/server`), hence the entry point is `dist/server/server/index.js` (`npm start`).
+- **Single-port serving** (`createApp` in `src/server/index.ts`): `/api/*` is handled by the routers; everything else is served from `dist/client` with an `index.html` fallback for SPA routes. Unknown `/api/*` paths are never answered with the SPA.
+- **Development**: `npm run dev` runs Express (`tsx watch`, :3000) and Vite (:5173, proxying `/api` to :3000).
+- **Configuration**: `PORT`, `DATA_FILE` (default `data.json`), `BFT_USER`, `BFT_PASS`.
+
+### Test & coverage gates
+
+- `npm test` runs all unit, integration and jsdom client tests (`vitest run`).
+- `npm run test:coverage` enforces ≥80 % statements/branches/functions/lines (`vitest.config.ts` thresholds).
+- `tests/integration/lifecycle.e2e.test.ts` covers the full drill (create → arm 3 min → fire → active → 10 min auto-complete), cancel/re-arm, delay bounds, manual complete, false alarm auto-clear, restart resilience via the real `data.json` persistence, and static/SPA/audio serving.
+
+---
+
+## 7. Directory & Code Organization
 
 ```
 bft/
@@ -192,6 +222,9 @@ bft/
 │   └── plans/
 │       └── 2026-10-18-001-feat-firealarm-simulator-web-app-plan.md
 ├── package.json
+├── public/
+│   └── sound/
+│       └── Warnung.mp3           # Alarm sound, served at /sound/Warnung.mp3
 ├── tsconfig.json
 ├── tsconfig.server.json
 ├── tsconfig.client.json
@@ -244,5 +277,6 @@ bft/
     │   ├── engine.test.ts    # Domain logic & timer tests
     │   └── auth.test.ts      # Basic Auth middleware tests
     └── integration/
-        └── api.test.ts       # Express endpoint integration tests
+        ├── api.test.ts             # Express endpoint integration tests
+        └── lifecycle.e2e.test.ts   # Full drill lifecycle, restart & static serving
 ```

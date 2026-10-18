@@ -38,7 +38,6 @@ export function App() {
           <AdminLayout
             isAuthenticated={isAuthenticated}
             onAuthenticatedChange={setIsAuthenticated}
-            onLogout={handleLogout}
           />
         )}
       </ToastProvider>

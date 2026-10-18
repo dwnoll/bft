@@ -4,7 +4,6 @@ import Card from '@mui/material/Card'
 import CardContent from '@mui/material/CardContent'
 import CardHeader from '@mui/material/CardHeader'
 import TextField from '@mui/material/TextField'
-import Typography from '@mui/material/Typography'
 import { useEffect, useState } from 'react'
 
 export interface SettingsCardProps {
