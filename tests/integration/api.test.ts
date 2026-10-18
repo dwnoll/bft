@@ -67,7 +67,7 @@ describe('Express REST API & Authentication Integration Tests (Unit 3)', () => {
     it('rejects unauthenticated requests to /api/trucks with 401', async () => {
       const { status, body, headers } = await api('/api/trucks')
       expect(status).toBe(401)
-      expect(body).toEqual({ error: 'Unauthorized' })
+      expect(body).toEqual({ error: 'Unauthorized', code: 'UNAUTHORIZED' })
       expect(headers.get('www-authenticate')).toContain('Basic realm="Firealarm Simulator Admin"')
     })
 
@@ -77,7 +77,7 @@ describe('Express REST API & Authentication Integration Tests (Unit 3)', () => {
         headers: { Authorization: badAuth },
       })
       expect(status).toBe(401)
-      expect(body).toEqual({ error: 'Unauthorized' })
+      expect(body).toEqual({ error: 'Unauthorized', code: 'UNAUTHORIZED' })
     })
 
     it('allows access with valid credentials', async () => {

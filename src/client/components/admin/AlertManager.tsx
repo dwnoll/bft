@@ -147,7 +147,8 @@ export function AlertManager({
   }
 
   const renderStatus = (alert: Alert) => {
-    const isArmed = alert.triggerAt !== undefined && alert.triggerAt > Date.now()
+    // Use server-authoritative status for action gating to avoid client clock skew.
+    const isArmed = alert.status === 'pending' && alert.triggerAt !== undefined
 
     if (isArmed && alert.triggerAt) {
       return <CountdownBadge triggerAt={alert.triggerAt} onExpire={onRefresh} />
@@ -229,7 +230,9 @@ export function AlertManager({
               </TableHead>
               <TableBody>
                 {(alerts || []).map((alert) => {
-                  const isArmed = alert.triggerAt !== undefined && alert.triggerAt > Date.now()
+                  // Server-authoritative: armed = pending status + triggerAt present.
+                  // Using Date.now() here could hide the "Abbrechen" button due to clock skew.
+                  const isArmed = alert.status === 'pending' && alert.triggerAt !== undefined
                   const isBusy = actionBusyId === alert.id || loading
 
                   return (

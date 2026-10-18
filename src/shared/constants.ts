@@ -28,9 +28,12 @@ export function seedTrucks(): Truck[] {
 }
 
 export function seedAlerts(trucks: Truck[]): Alert[] {
-  const elf = trucks.find((t) => t.name === 'ELF 1')!
-  const hlf = trucks.find((t) => t.name === 'HLF 20')!
-  const tlf = trucks.find((t) => t.name === 'TLF 16')!
+  const elf = trucks.find((t) => t.name === 'ELF 1')
+  const hlf = trucks.find((t) => t.name === 'HLF 20')
+  const tlf = trucks.find((t) => t.name === 'TLF 16')
+  if (!elf || !hlf || !tlf) {
+    throw new Error('seedAlerts: expected trucks "ELF 1", "HLF 20", "TLF 16" — check seedTrucks()')
+  }
   return [
     {
       id: ulid(),

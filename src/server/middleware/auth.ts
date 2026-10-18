@@ -1,9 +1,20 @@
+import { timingSafeEqual } from 'node:crypto'
 import type { Request, Response, NextFunction } from 'express'
 import {
   DEFAULT_ADMIN_USER,
   DEFAULT_ADMIN_PASS,
   ADMIN_AUTH_REALM,
 } from '../../shared/constants'
+
+/**
+ * Constant-time string comparison to prevent timing oracle attacks on
+ * credential enumeration.
+ */
+function safeEq(a: string, b: string): boolean {
+  const ba = Buffer.from(a)
+  const bb = Buffer.from(b)
+  return ba.length === bb.length && timingSafeEqual(ba, bb)
+}
 
 /**
  * Express middleware implementing HTTP Basic Authentication (R4, D2).
@@ -21,7 +32,7 @@ export function authMiddleware(
   const authHeader = req.headers.authorization
   if (!authHeader || !authHeader.startsWith('Basic ')) {
     res.setHeader('WWW-Authenticate', `Basic realm="${ADMIN_AUTH_REALM}"`)
-    res.status(401).json({ error: 'Unauthorized' })
+    res.status(401).json({ error: 'Unauthorized', code: 'UNAUTHORIZED' })
     return
   }
 
@@ -31,23 +42,23 @@ export function authMiddleware(
     credentials = Buffer.from(base64Credentials, 'base64').toString('utf8')
   } catch {
     res.setHeader('WWW-Authenticate', `Basic realm="${ADMIN_AUTH_REALM}"`)
-    res.status(401).json({ error: 'Unauthorized' })
+    res.status(401).json({ error: 'Unauthorized', code: 'UNAUTHORIZED' })
     return
   }
 
   const colonIndex = credentials.indexOf(':')
   if (colonIndex === -1) {
     res.setHeader('WWW-Authenticate', `Basic realm="${ADMIN_AUTH_REALM}"`)
-    res.status(401).json({ error: 'Unauthorized' })
+    res.status(401).json({ error: 'Unauthorized', code: 'UNAUTHORIZED' })
     return
   }
 
   const user = credentials.substring(0, colonIndex)
   const pass = credentials.substring(colonIndex + 1)
 
-  if (user !== expectedUser || pass !== expectedPass) {
+  if (!safeEq(user, expectedUser) || !safeEq(pass, expectedPass)) {
     res.setHeader('WWW-Authenticate', `Basic realm="${ADMIN_AUTH_REALM}"`)
-    res.status(401).json({ error: 'Unauthorized' })
+    res.status(401).json({ error: 'Unauthorized', code: 'UNAUTHORIZED' })
     return
   }
 

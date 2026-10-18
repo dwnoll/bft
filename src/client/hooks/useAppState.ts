@@ -25,9 +25,14 @@ export function useAppState(): AppStateResult {
 
     const poll = async () => {
       try {
+        // Per-request 10s timeout so TCP half-open stalls don't permanently
+        // block the poll chain. Combines with the unmount AbortController.
+        const signal = AbortSignal.any
+          ? AbortSignal.any([controller.signal, AbortSignal.timeout(10000)])
+          : controller.signal
         const res = await fetch('/api/state', {
           cache: 'no-store',
-          signal: controller.signal,
+          signal,
         })
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         const next = (await res.json()) as PublicState

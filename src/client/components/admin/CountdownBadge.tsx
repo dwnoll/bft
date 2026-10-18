@@ -1,5 +1,5 @@
 import Chip from '@mui/material/Chip'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { COLOR_WARNING } from '../../theme'
 
 export interface CountdownBadgeProps {
@@ -17,12 +17,21 @@ function formatRemaining(ms: number): string {
 export function CountdownBadge({ triggerAt, onExpire }: CountdownBadgeProps) {
   const [remainingMs, setRemainingMs] = useState<number>(() => Math.max(0, triggerAt - Date.now()))
 
+  // Guard against calling onExpire on every subsequent tick after expiry.
+  const expiredRef = useRef(false)
+  useEffect(() => {
+    expiredRef.current = false
+  }, [triggerAt])
+
   useEffect(() => {
     const update = () => {
       const rem = Math.max(0, triggerAt - Date.now())
       setRemainingMs(rem)
-      if (rem === 0 && onExpire) {
-        onExpire()
+      if (rem === 0) {
+        if (!expiredRef.current && onExpire) {
+          expiredRef.current = true
+          onExpire()
+        }
       }
     }
 

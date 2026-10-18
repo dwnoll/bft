@@ -79,6 +79,10 @@ export class StateEngine {
     return this.data.alerts
   }
 
+  get settings(): Settings {
+    return this.data.settings
+  }
+
   // --- helpers ---------------------------------------------------------------
 
   private findAlert(id: string): Alert {
@@ -111,7 +115,10 @@ export class StateEngine {
       return true
     }
     return this.data.alerts.some(
-      (a) => a.status === 'active' || a.triggerAt !== undefined,
+      // An alert occupies the slot when it is active, or when it is pending with
+      // an armed trigger. A pending alert without triggerAt does NOT occupy the
+      // slot — this prevents orphaned triggerAt values from permanently blocking.
+      (a) => a.status === 'active' || (a.status === 'pending' && a.triggerAt !== undefined),
     )
   }
 
@@ -124,8 +131,8 @@ export class StateEngine {
   armTrigger(alertId: string, delayMinutes: number, now?: number): Alert {
     const alert = this.findAlert(alertId)
     const n = now ?? this.currentNow()
-    const delayMs = delayMinutes * 60_000
 
+    // Validate before computing derived values so NaN/undefined never reaches triggerAt.
     if (!Number.isInteger(delayMinutes)) {
       throw new ValidationError('Delay minutes must be an integer')
     }
@@ -138,6 +145,7 @@ export class StateEngine {
       throw new InvariantError(ALARM_ACTIVE_OR_PENDING, 'Alarm aktiv oder ausstehend')
     }
 
+    const delayMs = delayMinutes * 60_000
     alert.status = 'pending'
     alert.triggerAt = n + delayMs
     this.schedulePersist()
@@ -150,11 +158,10 @@ export class StateEngine {
    */
   cancelTrigger(alertId: string): Alert {
     const alert = this.findAlert(alertId)
-    alert.triggerAt = undefined
-    // An alert should only be cancellable while armed, but guard the transition.
-    if (alert.status === 'active') {
-      alert.status = 'pending'
+    if (alert.status !== 'pending' || alert.triggerAt === undefined) {
+      throw new InvariantError('ALERT_NOT_ARMED', 'Alarm ist nicht ausgelöst')
     }
+    alert.triggerAt = undefined
     this.schedulePersist()
     return alert
   }

@@ -1,4 +1,5 @@
 import express, { type Express, type Request, type Response, type NextFunction } from 'express'
+import helmet from 'helmet'
 import fs from 'node:fs'
 import path from 'node:path'
 import {
@@ -27,6 +28,8 @@ export interface AppOptions {
 export function createApp(engine: StateEngine, options: AppOptions = {}): Express {
   const app = express()
 
+  // Security headers: clickjacking, XSS mitigation, content-type sniffing.
+  app.use(helmet())
   app.use(express.json())
 
   // --- Public routes ---
@@ -74,9 +77,9 @@ export function createApp(engine: StateEngine, options: AppOptions = {}): Expres
     }
 
     console.error('Unhandled server error:', err)
-    res.status(500).json({
-      error: err instanceof Error ? err.message : 'Internal Server Error',
-    })
+    // Never reflect raw exception messages to callers — they may contain
+    // filesystem paths or other internal details.
+    res.status(500).json({ error: 'Internal Server Error' })
   })
 
   return app

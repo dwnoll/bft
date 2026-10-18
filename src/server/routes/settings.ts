@@ -6,7 +6,7 @@ export function createSettingsRouter(engine: StateEngine): Router {
 
   // GET /api/settings — Get current settings (PRD §9, §10)
   router.get('/settings', (_req, res) => {
-    res.json(engine.getState().settings)
+    res.json(engine.settings)
   })
 
   // PATCH /api/settings — Update settings such as soundDurationSec (PRD §9, §10, R17)

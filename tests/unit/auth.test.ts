@@ -59,7 +59,7 @@ describe('authMiddleware (R4, D2)', () => {
 
     expect(next).not.toHaveBeenCalled()
     expect(getStatus()).toBe(401)
-    expect(getBody()).toEqual({ error: 'Unauthorized' })
+    expect(getBody()).toEqual({ error: 'Unauthorized', code: 'UNAUTHORIZED' })
     expect(getHeaders()['www-authenticate']).toBe(`Basic realm="${ADMIN_AUTH_REALM}"`)
   })
 

@@ -9,7 +9,7 @@ import Tab from '@mui/material/Tab'
 import Tabs from '@mui/material/Tabs'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { DEFAULT_ADMIN_PASS, DEFAULT_ADMIN_USER } from '../../../shared/constants'
 import type { Alert as AlertType, Settings, Truck } from '../../../shared/types'
 import { apiClient } from '../../api/client'
@@ -50,7 +50,9 @@ export function AdminLayout({
   const [trucks, setTrucks] = useState<Truck[]>([])
   const [alerts, setAlerts] = useState<AlertType[]>([])
   const [settings, setSettings] = useState<Settings>({ soundDurationSec: 60 })
-  const [loading] = useState(false)
+  // loading is always false (data loading is tracked per-operation via dedicated state).
+  // Keeping as a constant to avoid prop-drilling refactor across child components.
+  const loading = false
   const [tabIndex, setTabIndex] = useState(0)
 
   // False Alarm Trigger State
@@ -60,8 +62,19 @@ export function AdminLayout({
   // Settings save state
   const [savingSettings, setSavingSettings] = useState(false)
 
+  // Keep the latest onAuthenticatedChange in a ref so loadData never captures a stale prop.
+  const onAuthenticatedChangeRef = useRef(onAuthenticatedChange)
+  useEffect(() => {
+    onAuthenticatedChangeRef.current = onAuthenticatedChange
+  }, [onAuthenticatedChange])
+
+  // Guard against concurrent loadData calls: the 2s interval and manual refreshes
+  // (handleFalseAlarmConfirm, handleSaveSettings) can overlap on slow networks.
+  const loadDataInFlight = useRef(false)
+
   const loadData = useCallback(async () => {
-    if (!apiClient.isAuthenticated()) return
+    if (!apiClient.isAuthenticated() || loadDataInFlight.current) return
+    loadDataInFlight.current = true
     try {
       const [fetchedTrucks, fetchedAlerts, fetchedSettings] = await Promise.all([
         apiClient.getTrucks(),
@@ -74,10 +87,12 @@ export function AdminLayout({
     } catch (err) {
       if (err && typeof err === 'object' && 'status' in err && (err as { status: number }).status === 401) {
         setIsAuthenticated(false)
-        onAuthenticatedChange?.(false)
+        onAuthenticatedChangeRef.current?.(false)
         apiClient.clearCredentials()
         setAuthError('Sitzung abgelaufen oder ungültige Anmeldedaten')
       }
+    } finally {
+      loadDataInFlight.current = false
     }
   }, [])
 
