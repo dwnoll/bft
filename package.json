@@ -1,0 +1,26 @@
+{
+  "name": "firealarm-simulator",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Fire station alarm drill simulator (Einsatzmonitor) with an Express JSON API and a React/MUI dashboard.",
+  "scripts": {
+    "dev": "concurrently \"tsx watch src/server/index.ts\" \"vite\"",
+    "build": "vite build && tsc -p tsconfig.server.json && node -e \"fs.cpSync('docs/Warnung.mp3','dist/client/sound/Warnung.mp3',{recursive:true,force:true})\"",
+    "start": "node dist/server/index.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "ulid": "^2.3.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.10.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^8.2.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10",
+    "vitest": "^2.1.8"
+  }
+}
