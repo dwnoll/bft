@@ -517,7 +517,7 @@ Tracking the Compound Engineering cycle for Firealarm Simulator:
   - [x] Unit 4: Public Station Dashboard & Audio Engine
   - [x] Unit 5: Admin Panel (Truck CRUD, Alert CRUD, Delayed Trigger Dialog & Controls)
   - [x] Unit 6: Production Build, Audio Asset Pipeline, End-to-End Verification & Documentation
-- [ ] **Phase 4: Code Review & Quality Audit (ce-review)**
+- [x] **Phase 4: Code Review & Quality Audit (ce-review)** (Completed — 8 P1, 9 P2, 8 P3 findings resolved; 141/141 tests passing. Skipped: credentials in sessionStorage (#16) and PATCH-on-active-alert (#18) — product decisions deferred.)
 - [ ] **Phase 5: Release & Verification**
 
 ---
