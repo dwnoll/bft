@@ -32,7 +32,7 @@ Key docs:
 - HTTP Basic auth on all `/api/*` routes except `GET /api/state` (public).
 - Credentials configured via `BFT_USER` / `BFT_PASS` env vars.
 - Defaults (for development): `ffw_bft` / `bft_2026`.
-- Default credentials are defined in `src/shared/constants.ts` (also used by auth middleware).
+- Default credentials are defined in `src/server/config.ts` (server-only — not bundled into client JS by Vite).
 
 ## Domain rules — easy to miss (see PRD + architecture.md)
 
