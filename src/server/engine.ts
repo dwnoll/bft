@@ -1,4 +1,5 @@
-import type { Alert, DataFile, PendingTrigger, PublicState, Truck } from '../shared/types'
+import { ulid } from 'ulid'
+import type { Alert, DataFile, PendingTrigger, PublicState, Settings, Truck } from '../shared/types'
 import {
   AUTO_COMPLETE_MS,
   MAX_DELAY_MINUTES,
@@ -239,8 +240,54 @@ export class StateEngine {
 
   // --- management ------------------------------------------------------------
 
+  /** Create a new truck (PRD §5). */
+  createTruck(input: { name?: unknown; seats?: unknown }): Truck {
+    if (typeof input.name !== 'string' || input.name.trim().length === 0) {
+      throw new ValidationError('Truck name is required and cannot be empty')
+    }
+    const seats = typeof input.seats === 'number' ? input.seats : Number(input.seats)
+    if (!Number.isInteger(seats) || seats < 0) {
+      throw new ValidationError('Truck seats must be a non-negative integer')
+    }
+    const truck: Truck = {
+      id: ulid(),
+      name: input.name.trim(),
+      seats,
+    }
+    this.data.trucks.push(truck)
+    this.schedulePersist()
+    return truck
+  }
+
+  /** Update an existing truck by id (PRD §5). */
+  updateTruck(id: string, input: { name?: unknown; seats?: unknown }): Truck {
+    const truck = this.data.trucks.find((t) => t.id === id)
+    if (!truck) {
+      throw new NotFoundError(id)
+    }
+    if (input.name !== undefined) {
+      if (typeof input.name !== 'string' || input.name.trim().length === 0) {
+        throw new ValidationError('Truck name cannot be empty')
+      }
+      truck.name = input.name.trim()
+    }
+    if (input.seats !== undefined) {
+      const seats = typeof input.seats === 'number' ? input.seats : Number(input.seats)
+      if (!Number.isInteger(seats) || seats < 0) {
+        throw new ValidationError('Truck seats must be a non-negative integer')
+      }
+      truck.seats = seats
+    }
+    this.schedulePersist()
+    return truck
+  }
+
   /** Remove a truck and silently strip it from every alert's truckIds. */
   deleteTruck(truckId: string): Truck[] {
+    const exists = this.data.trucks.some((t) => t.id === truckId)
+    if (!exists) {
+      throw new NotFoundError(truckId)
+    }
     this.data.trucks = this.data.trucks.filter((t) => t.id !== truckId)
     for (const alert of this.data.alerts) {
       alert.truckIds = alert.truckIds.filter((id) => id !== truckId)
@@ -249,11 +296,133 @@ export class StateEngine {
     return this.data.trucks
   }
 
+  /** Create a planned alert (PRD §6). */
+  createAlert(input: {
+    name?: unknown
+    category?: unknown
+    address?: unknown
+    info?: unknown
+    notes?: unknown
+    truckIds?: unknown
+  }): Alert {
+    if (typeof input.name !== 'string' || input.name.trim().length === 0) {
+      throw new ValidationError('Alert name is required and cannot be empty')
+    }
+    if (typeof input.category !== 'string' || input.category.trim().length === 0) {
+      throw new ValidationError('Alert category is required and cannot be empty')
+    }
+    if (typeof input.address !== 'string' || input.address.trim().length === 0) {
+      throw new ValidationError('Alert address is required and cannot be empty')
+    }
+    if (typeof input.info !== 'string' || input.info.trim().length === 0) {
+      throw new ValidationError('Alert info is required and cannot be empty')
+    }
+    if (input.truckIds !== undefined && !Array.isArray(input.truckIds)) {
+      throw new ValidationError('truckIds must be an array')
+    }
+
+    const truckIds: string[] = Array.isArray(input.truckIds)
+      ? input.truckIds.filter((id): id is string => typeof id === 'string')
+      : []
+
+    const notes =
+      typeof input.notes === 'string' && input.notes.trim().length > 0
+        ? input.notes.trim()
+        : undefined
+
+    const alert: Alert = {
+      id: ulid(),
+      name: input.name.trim(),
+      category: input.category.trim(),
+      address: input.address.trim(),
+      info: input.info.trim(),
+      notes,
+      truckIds,
+      status: 'pending',
+    }
+    this.data.alerts.push(alert)
+    this.schedulePersist()
+    return alert
+  }
+
+  /** Update an existing alert (PRD §6). */
+  updateAlert(
+    id: string,
+    input: {
+      name?: unknown
+      category?: unknown
+      address?: unknown
+      info?: unknown
+      notes?: unknown
+      truckIds?: unknown
+    },
+  ): Alert {
+    const alert = this.findAlert(id)
+    if (input.name !== undefined) {
+      if (typeof input.name !== 'string' || input.name.trim().length === 0) {
+        throw new ValidationError('Alert name cannot be empty')
+      }
+      alert.name = input.name.trim()
+    }
+    if (input.category !== undefined) {
+      if (typeof input.category !== 'string' || input.category.trim().length === 0) {
+        throw new ValidationError('Alert category cannot be empty')
+      }
+      alert.category = input.category.trim()
+    }
+    if (input.address !== undefined) {
+      if (typeof input.address !== 'string' || input.address.trim().length === 0) {
+        throw new ValidationError('Alert address cannot be empty')
+      }
+      alert.address = input.address.trim()
+    }
+    if (input.info !== undefined) {
+      if (typeof input.info !== 'string' || input.info.trim().length === 0) {
+        throw new ValidationError('Alert info cannot be empty')
+      }
+      alert.info = input.info.trim()
+    }
+    if (input.notes !== undefined) {
+      alert.notes =
+        typeof input.notes === 'string' && input.notes.trim().length > 0
+          ? input.notes.trim()
+          : undefined
+    }
+    if (input.truckIds !== undefined) {
+      if (!Array.isArray(input.truckIds)) {
+        throw new ValidationError('truckIds must be an array')
+      }
+      alert.truckIds = input.truckIds.filter((tid): tid is string => typeof tid === 'string')
+    }
+    this.schedulePersist()
+    return alert
+  }
+
   /** Remove an alert. Deleting an armed alert frees the one-alarm slot. */
   deleteAlert(alertId: string): Alert[] {
+    const exists = this.data.alerts.some((a) => a.id === alertId)
+    if (!exists) {
+      throw new NotFoundError(alertId)
+    }
     this.data.alerts = this.data.alerts.filter((a) => a.id !== alertId)
     this.schedulePersist()
     return this.data.alerts
+  }
+
+  /** Update system settings (PRD §9). */
+  updateSettings(input: { soundDurationSec?: unknown }): Settings {
+    if (input.soundDurationSec !== undefined) {
+      const duration =
+        typeof input.soundDurationSec === 'number'
+          ? input.soundDurationSec
+          : Number(input.soundDurationSec)
+      if (!Number.isInteger(duration) || duration <= 0) {
+        throw new ValidationError('soundDurationSec must be a positive integer')
+      }
+      this.data.settings.soundDurationSec = duration
+      this.schedulePersist()
+    }
+    return this.data.settings
   }
 
   // --- read model ------------------------------------------------------------

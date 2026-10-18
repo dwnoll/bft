@@ -319,6 +319,62 @@ describe('StateEngine truck management (R6, R14)', () => {
     expect(armed.id).toBe('al-2')
     expect(armed.triggerAt).toBe(T0 + DELAY_5MIN_MS)
   })
+
+  it('creates and updates trucks with validation', () => {
+    const engine = makeEngine()
+    const truck = engine.createTruck({ name: 'LF 20', seats: 9 })
+    expect(truck.id).toBeDefined()
+    expect(truck.name).toBe('LF 20')
+    expect(truck.seats).toBe(9)
+    expect(engine.trucks).toHaveLength(2)
+
+    const updated = engine.updateTruck(truck.id, { name: 'LF 20 KatS', seats: 8 })
+    expect(updated.name).toBe('LF 20 KatS')
+    expect(updated.seats).toBe(8)
+
+    expect(() => engine.createTruck({ name: '', seats: 2 })).toThrow(ValidationError)
+    expect(() => engine.createTruck({ name: 'Test', seats: -1 })).toThrow(ValidationError)
+    expect(() => engine.updateTruck('non-existent', { name: 'X' })).toThrow(NotFoundError)
+  })
+
+  it('creates and updates alerts with validation', () => {
+    const engine = makeEngine()
+    const alert = engine.createAlert({
+      name: 'Brand',
+      category: 'Brand',
+      address: 'Hauptstr. 1',
+      info: 'Rauchentwicklung',
+      notes: 'Hinterhof',
+      truckIds: ['trk-1'],
+    })
+    expect(alert.id).toBeDefined()
+    expect(alert.name).toBe('Brand')
+    expect(alert.status).toBe('pending')
+    expect(alert.notes).toBe('Hinterhof')
+    expect(alert.truckIds).toEqual(['trk-1'])
+
+    const updated = engine.updateAlert(alert.id, {
+      name: 'Großbrand',
+      info: 'Dachstuhl brennt',
+      truckIds: [],
+    })
+    expect(updated.name).toBe('Großbrand')
+    expect(updated.info).toBe('Dachstuhl brennt')
+    expect(updated.truckIds).toEqual([])
+
+    expect(() => engine.createAlert({ name: '', category: 'A', address: 'B', info: 'C' })).toThrow(ValidationError)
+    expect(() => engine.updateAlert('non-existent', { name: 'X' })).toThrow(NotFoundError)
+  })
+
+  it('updates settings with validation', () => {
+    const engine = makeEngine()
+    const settings = engine.updateSettings({ soundDurationSec: 120 })
+    expect(settings.soundDurationSec).toBe(120)
+    expect(engine.getState().settings.soundDurationSec).toBe(120)
+
+    expect(() => engine.updateSettings({ soundDurationSec: 0 })).toThrow(ValidationError)
+    expect(() => engine.updateSettings({ soundDurationSec: -10 })).toThrow(ValidationError)
+  })
 })
 
 describe('StateEngine not found (R8)', () => {

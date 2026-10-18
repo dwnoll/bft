@@ -225,7 +225,7 @@ sequenceDiagram
 
 ## Implementation Units
 
-- [ ] **Unit 1: Project Scaffolding, TypeScript Configuration, Core Domain Types & Atomic Storage**
+- [x] **Unit 1: Project Scaffolding, TypeScript Configuration, Core Domain Types & Atomic Storage**
 
 **Goal:** Establish the TypeScript project configuration, dependency definitions, shared domain interfaces, default seed data, and atomic JSON persistence layer.
 
@@ -272,7 +272,7 @@ sequenceDiagram
 
 ---
 
-- [ ] **Unit 2: Alert Lifecycle Engine, Timer Tick Loop & Pure Domain Logic**
+- [x] **Unit 2: Alert Lifecycle Engine, Timer Tick Loop & Pure Domain Logic**
 
 **Goal:** Implement the pure domain state machine and tick loop that handles trigger arming, cancellation, single-alarm enforcement, auto-activation, 10-minute auto-completion, false alarm drills, and cascading truck deletion.
 
@@ -321,7 +321,7 @@ sequenceDiagram
 
 ---
 
-- [ ] **Unit 3: Express Backend API & Basic Authentication**
+- [x] **Unit 3: Express Backend API & Basic Authentication**
 
 **Goal:** Create Express server routes, Basic Auth middleware (`BFT_USER` / `BFT_PASS`), JSON request validation, periodic tick runner, and wire up public and admin endpoints.
 
