@@ -3,7 +3,8 @@ import http from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { createApp } from '../../src/server/index'
 import { StateEngine, type DataFile } from '../../src/server/engine'
-import { DEFAULT_ADMIN_USER, DEFAULT_ADMIN_PASS, defaultDataFile } from '../../src/shared/constants'
+import { DEFAULT_ADMIN_USER, DEFAULT_ADMIN_PASS } from '../../src/server/config'
+import { defaultDataFile } from '../../src/shared/constants'
 import type { PublicState, Truck, Alert, Settings } from '../../src/shared/types'
 
 describe('Express REST API & Authentication Integration Tests (Unit 3)', () => {

@@ -1,11 +1,6 @@
 import { ulid } from 'ulid'
 import type { Alert, AlertStatus, DataFile, Settings, Truck } from './types'
 
-// --- Authentication (R4, D2) ---
-export const DEFAULT_ADMIN_USER = 'ffw_bft'
-export const DEFAULT_ADMIN_PASS = 'bft_2026'
-export const ADMIN_AUTH_REALM = 'Firealarm Simulator Admin'
-
 // --- Lifecycle timing (R3, R17a, R11, R12, R15) ---
 export const TICK_INTERVAL_MS = 1000
 export const ALERT_ACTIVE_SECONDS = 600 // 10 minutes

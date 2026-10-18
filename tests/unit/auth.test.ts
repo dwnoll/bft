@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import type { Request, Response, NextFunction } from 'express'
 import { authMiddleware } from '../../src/server/middleware/auth'
-import { ADMIN_AUTH_REALM, DEFAULT_ADMIN_USER, DEFAULT_ADMIN_PASS } from '../../src/shared/constants'
+import { ADMIN_AUTH_REALM, DEFAULT_ADMIN_USER, DEFAULT_ADMIN_PASS } from '../../src/server/config'
 
 describe('authMiddleware (R4, D2)', () => {
   const originalEnv = process.env

@@ -4,7 +4,7 @@ import {
   DEFAULT_ADMIN_USER,
   DEFAULT_ADMIN_PASS,
   ADMIN_AUTH_REALM,
-} from '../../shared/constants'
+} from '../config'
 
 /**
  * Constant-time string comparison to prevent timing oracle attacks on

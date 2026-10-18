@@ -60,6 +60,13 @@ describe('AdminLayout', () => {
       </ToastProvider>,
     )
 
+    // Credentials no longer pre-filled — login form starts empty (security: #2 fix).
+    fireEvent.change(screen.getByLabelText(/Benutzername/i), {
+      target: { value: 'ffw_bft' },
+    })
+    fireEvent.change(screen.getByLabelText(/Passwort/i), {
+      target: { value: 'bft_2026' },
+    })
     fireEvent.click(screen.getByRole('button', { name: 'Anmelden' }))
 
     await waitFor(() => {

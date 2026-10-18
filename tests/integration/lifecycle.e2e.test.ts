@@ -7,10 +7,9 @@ import type { AddressInfo } from 'node:net'
 import { createApp } from '../../src/server/index'
 import { StateEngine } from '../../src/server/engine'
 import { load, save } from '../../src/server/storage'
+import { DEFAULT_ADMIN_PASS, DEFAULT_ADMIN_USER } from '../../src/server/config'
 import {
   AUTO_COMPLETE_MS,
-  DEFAULT_ADMIN_PASS,
-  DEFAULT_ADMIN_USER,
   defaultDataFile,
 } from '../../src/shared/constants'
 import type { Alert, PublicState } from '../../src/shared/types'

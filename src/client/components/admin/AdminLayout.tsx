@@ -10,7 +10,6 @@ import Tabs from '@mui/material/Tabs'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { DEFAULT_ADMIN_PASS, DEFAULT_ADMIN_USER } from '../../../shared/constants'
 import type { Alert as AlertType, Settings, Truck } from '../../../shared/types'
 import { apiClient } from '../../api/client'
 import { COLOR_EMERGENCY } from '../../theme'
@@ -41,8 +40,8 @@ export function AdminLayout({
       setIsAuthenticated(propIsAuthenticated)
     }
   }, [propIsAuthenticated])
-  const [username, setUsername] = useState(DEFAULT_ADMIN_USER)
-  const [password, setPassword] = useState(DEFAULT_ADMIN_PASS)
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
   const [authError, setAuthError] = useState<string | null>(null)
   const [loggingIn, setLoggingIn] = useState(false)
 
