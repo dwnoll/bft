@@ -81,11 +81,11 @@ export function Dashboard() {
               <Typography variant="h5" component="p" sx={{ mt: 1 }}>
                 {activeAlert.info}
               </Typography>
-              {activeAlert.notes && (
+              {/* {activeAlert.notes && (
                 <Typography variant="h6" component="p" sx={{ mt: 1, opacity: 0.9 }}>
                   {activeAlert.notes}
                 </Typography>
-              )}
+              )} */}
             </Paper>
           ) : falseAlarm ? (
             <Paper
