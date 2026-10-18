@@ -414,7 +414,7 @@ sequenceDiagram
 
 ---
 
-- [ ] **Unit 5: Admin Panel (Truck CRUD, Alert CRUD, Delayed Trigger Dialog & Controls)**
+- [x] **Unit 5: Admin Panel (Truck CRUD, Alert CRUD, Delayed Trigger Dialog & Controls)**
 
 **Goal:** Build the authenticated Admin interface in German with truck management, planned alert CRUD, delayed trigger slider dialog (3–15 min), live countdown badges with cancel action, manual completion, one-shot false alarm trigger, and sound settings.
 
@@ -514,8 +514,8 @@ Tracking the Compound Engineering cycle for Firealarm Simulator:
   - [x] Unit 1: Project Scaffolding, TypeScript Configuration, Core Domain Types & Atomic Storage
   - [x] Unit 2: Alert Lifecycle Engine, Timer Tick Loop & Pure Domain Logic
   - [x] Unit 3: Express Backend API & Basic Authentication
-  - [ ] Unit 4: Public Station Dashboard & Audio Engine
-  - [ ] Unit 5: Admin Panel (Truck CRUD, Alert CRUD, Delayed Trigger Dialog & Controls)
+  - [x] Unit 4: Public Station Dashboard & Audio Engine
+  - [x] Unit 5: Admin Panel (Truck CRUD, Alert CRUD, Delayed Trigger Dialog & Controls)
   - [ ] Unit 6: Production Build, Audio Asset Pipeline, End-to-End Verification & Documentation
 - [ ] **Phase 4: Code Review & Quality Audit (ce-review)**
 - [ ] **Phase 5: Release & Verification**
