@@ -28,7 +28,7 @@ export function TruckCard({ truck, highlighted }: TruckCardProps) {
         {truck.name}
       </Typography>
       <Typography variant="body1" sx={{ opacity: 0.85 }}>
-        {truck.seats} {truck.seats === 1 ? 'Sitzplatz' : 'Sitzplätze'}
+        {truck.category}
       </Typography>
       {highlighted && (
         <Chip

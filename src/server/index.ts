@@ -31,11 +31,15 @@ export function createApp(engine: StateEngine, options: AppOptions = {}): Expres
   // Security headers: clickjacking, XSS mitigation, content-type sniffing.
   // frame-src allows the embedded Google Maps iframe (LocationPanel) while
   // the remaining default CSP directives stay in effect.
+  // upgrade-insecure-requests is disabled: the app is served over plain HTTP
+  // on the LAN, and the directive makes browsers rewrite asset requests to
+  // https:// for any non-localhost origin, breaking the page.
   app.use(
     helmet({
       contentSecurityPolicy: {
         directives: {
           'frame-src': ['https://maps.google.com', 'https://www.google.com'],
+          'upgrade-insecure-requests': null,
         },
       },
     }),

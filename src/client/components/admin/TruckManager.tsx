@@ -17,7 +17,8 @@ import TableRow from '@mui/material/TableRow'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import { useState } from 'react'
-import type { Truck } from '../../../shared/types'
+import type { Truck, TruckCategory } from '../../../shared/types'
+import { TRUCK_CATEGORIES } from '../../../shared/constants'
 import { apiClient } from '../../api/client'
 import { ConfirmDialog } from '../common/ConfirmDialog'
 import { useToast } from '../common/ToastContainer'
@@ -35,7 +36,7 @@ export function TruckManager({ trucks, onRefresh, loading = false }: TruckManage
   const [formOpen, setFormOpen] = useState(false)
   const [editingTruck, setEditingTruck] = useState<Truck | null>(null)
   const [name, setName] = useState('')
-  const [seats, setSeats] = useState<number>(4)
+  const [category, setCategory] = useState<TruckCategory>(TRUCK_CATEGORIES[0])
   const [nameError, setNameError] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
@@ -46,7 +47,7 @@ export function TruckManager({ trucks, onRefresh, loading = false }: TruckManage
   const handleOpenAdd = () => {
     setEditingTruck(null)
     setName('')
-    setSeats(4)
+    setCategory(TRUCK_CATEGORIES[0])
     setNameError(false)
     setFormOpen(true)
   }
@@ -54,7 +55,7 @@ export function TruckManager({ trucks, onRefresh, loading = false }: TruckManage
   const handleOpenEdit = (truck: Truck) => {
     setEditingTruck(truck)
     setName(truck.name)
-    setSeats(truck.seats)
+    setCategory(truck.category)
     setNameError(false)
     setFormOpen(true)
   }
@@ -71,13 +72,13 @@ export function TruckManager({ trucks, onRefresh, loading = false }: TruckManage
       if (editingTruck) {
         await apiClient.updateTruck(editingTruck.id, {
           name: name.trim(),
-          seats: Math.max(1, seats),
+          category,
         })
         showSuccess(`Fahrzeug "${name.trim()}" aktualisiert`)
       } else {
         await apiClient.createTruck({
           name: name.trim(),
-          seats: Math.max(1, seats),
+          category,
         })
         showSuccess(`Fahrzeug "${name.trim()}" angelegt`)
       }
@@ -134,7 +135,7 @@ export function TruckManager({ trucks, onRefresh, loading = false }: TruckManage
                 <TableRow>
                   <TableCell sx={{ fontWeight: 700 }}>Funkrufname / Bezeichnung</TableCell>
                   <TableCell sx={{ fontWeight: 700 }} align="center">
-                    Sitzplätze (Besatzung)
+                    Kategorie
                   </TableCell>
                   <TableCell sx={{ fontWeight: 700 }} align="right">
                     Aktionen
@@ -145,7 +146,7 @@ export function TruckManager({ trucks, onRefresh, loading = false }: TruckManage
                 {trucks.map((truck) => (
                   <TableRow key={truck.id} hover>
                     <TableCell sx={{ fontWeight: 600 }}>{truck.name}</TableCell>
-                    <TableCell align="center">{truck.seats}</TableCell>
+                    <TableCell align="center">{truck.category}</TableCell>
                     <TableCell align="right">
                       <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
                         <Button
@@ -197,14 +198,20 @@ export function TruckManager({ trucks, onRefresh, loading = false }: TruckManage
                 autoFocus
               />
               <TextField
-                label="Sitzplätze"
-                type="number"
-                value={seats}
-                onChange={(e) => setSeats(parseInt(e.target.value, 10) || 1)}
-                inputProps={{ min: 1, step: 1 }}
+                select
+                label="Kategorie"
+                SelectProps={{ native: true }}
+                value={category}
+                onChange={(e) => setCategory(e.target.value as TruckCategory)}
                 required
                 fullWidth
-              />
+              >
+                {TRUCK_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </TextField>
             </Box>
           </DialogContent>
           <DialogActions sx={{ px: 3, pb: 2 }}>

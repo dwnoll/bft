@@ -100,28 +100,28 @@ describe('Express REST API & Authentication Integration Tests (Unit 3)', () => {
           Authorization: authHeader,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ name: 'RW 2', seats: 3 }),
+        body: JSON.stringify({ name: 'RW 2', category: 'Trupp' }),
       })
 
       expect(status).toBe(201)
       const truck = body as Truck
       expect(truck.id).toBeDefined()
       expect(truck.name).toBe('RW 2')
-      expect(truck.seats).toBe(3)
+      expect(truck.category).toBe('Trupp')
     })
 
-    it('validates truck creation input (returns 400 on empty name or invalid seats)', async () => {
+    it('validates truck creation input (returns 400 on empty name or invalid category)', async () => {
       const res1 = await api('/api/trucks', {
         method: 'POST',
         headers: { Authorization: authHeader, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: '', seats: 3 }),
+        body: JSON.stringify({ name: '', category: 'Trupp' }),
       })
       expect(res1.status).toBe(400)
 
       const res2 = await api('/api/trucks', {
         method: 'POST',
         headers: { Authorization: authHeader, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: 'Valid', seats: -2 }),
+        body: JSON.stringify({ name: 'Valid', category: 'invalid' }),
       })
       expect(res2.status).toBe(400)
     })
@@ -131,13 +131,13 @@ describe('Express REST API & Authentication Integration Tests (Unit 3)', () => {
       const { status, body } = await api(`/api/trucks/${truckId}`, {
         method: 'PATCH',
         headers: { Authorization: authHeader, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: 'ELF 1 Mod', seats: 3 }),
+        body: JSON.stringify({ name: 'ELF 1 Mod', category: 'Staffel' }),
       })
 
       expect(status).toBe(200)
       const updated = body as Truck
       expect(updated.name).toBe('ELF 1 Mod')
-      expect(updated.seats).toBe(3)
+      expect(updated.category).toBe('Staffel')
     })
 
     it('returns 404 when patching a non-existent truck', async () => {
@@ -425,7 +425,7 @@ describe('Express REST API & Authentication Integration Tests (Unit 3)', () => {
       const createTruckRes = await api('/api/trucks', {
         method: 'POST',
         headers: { Authorization: authHeader, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: 'KdoW 1', seats: 2 }),
+        body: JSON.stringify({ name: 'KdoW 1', category: 'Staffel' }),
       })
       expect(createTruckRes.status).toBe(201)
       const newTruck = createTruckRes.body as Truck

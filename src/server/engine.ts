@@ -1,5 +1,5 @@
 import { ulid } from 'ulid'
-import type { Alert, DataFile, PendingTrigger, PublicState, Settings, Truck } from '../shared/types'
+import type { Alert, DataFile, PendingTrigger, PublicState, Settings, Truck, TruckCategory } from '../shared/types'
 import {
   AUTO_COMPLETE_MS,
   DEFAULT_ZOOM,
@@ -11,6 +11,7 @@ import {
   MIN_LATITUDE,
   MIN_LONGITUDE,
   MIN_ZOOM,
+  TRUCK_CATEGORIES,
 } from '../shared/constants'
 
 export const ALARM_ACTIVE_OR_PENDING = 'ALARM_ACTIVE_OR_PENDING'
@@ -313,19 +314,23 @@ export class StateEngine {
 
   // --- management ------------------------------------------------------------
 
+  private validateCategory(value: unknown): TruckCategory {
+    if (typeof value === 'string' && (TRUCK_CATEGORIES as readonly string[]).includes(value)) {
+      return value as TruckCategory
+    }
+    throw new ValidationError(`Truck category must be one of ${TRUCK_CATEGORIES.join(', ')}`)
+  }
+
   /** Create a new truck (PRD §5). */
-  createTruck(input: { name?: unknown; seats?: unknown }): Truck {
+  createTruck(input: { name?: unknown; category?: unknown }): Truck {
     if (typeof input.name !== 'string' || input.name.trim().length === 0) {
       throw new ValidationError('Truck name is required and cannot be empty')
     }
-    const seats = typeof input.seats === 'number' ? input.seats : Number(input.seats)
-    if (!Number.isInteger(seats) || seats < 0) {
-      throw new ValidationError('Truck seats must be a non-negative integer')
-    }
+    const category = this.validateCategory(input.category)
     const truck: Truck = {
       id: ulid(),
       name: input.name.trim(),
-      seats,
+      category,
     }
     this.data.trucks.push(truck)
     this.schedulePersist()
@@ -333,7 +338,7 @@ export class StateEngine {
   }
 
   /** Update an existing truck by id (PRD §5). */
-  updateTruck(id: string, input: { name?: unknown; seats?: unknown }): Truck {
+  updateTruck(id: string, input: { name?: unknown; category?: unknown }): Truck {
     const truck = this.data.trucks.find((t) => t.id === id)
     if (!truck) {
       throw new NotFoundError(id)
@@ -344,12 +349,8 @@ export class StateEngine {
       }
       truck.name = input.name.trim()
     }
-    if (input.seats !== undefined) {
-      const seats = typeof input.seats === 'number' ? input.seats : Number(input.seats)
-      if (!Number.isInteger(seats) || seats < 0) {
-        throw new ValidationError('Truck seats must be a non-negative integer')
-      }
-      truck.seats = seats
+    if (input.category !== undefined) {
+      truck.category = this.validateCategory(input.category)
     }
     this.schedulePersist()
     return truck

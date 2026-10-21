@@ -288,7 +288,7 @@ export function AlertFormDialog({
                   {availableTrucks.map((truck) => (
                     <MenuItem key={truck.id} value={truck.id}>
                       <Checkbox checked={selectedTruckIds.includes(truck.id)} />
-                      <ListItemText primary={`${truck.name} (${truck.seats} Plätze)`} />
+                      <ListItemText primary={`${truck.name} (${truck.category})`} />
                     </MenuItem>
                   ))}
                 </Select>

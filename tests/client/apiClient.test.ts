@@ -27,7 +27,7 @@ describe('ApiClient', () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
-      json: async () => [{ id: '1', name: 'HLF 20', seats: 5 }],
+      json: async () => [{ id: '1', name: 'HLF 20', category: 'Gruppe' }],
     })
     global.fetch = mockFetch
 
@@ -78,10 +78,10 @@ describe('ApiClient', () => {
 
     const mockFetch = vi.fn().mockImplementation(async (url: string, options: RequestInit) => {
       if (url === '/api/trucks' && options.method === 'POST') {
-        return { ok: true, status: 201, json: async () => ({ id: 't1', name: 'LF 10', seats: 4 }) }
+        return { ok: true, status: 201, json: async () => ({ id: 't1', name: 'LF 10', category: 'Trupp' }) }
       }
       if (url === '/api/trucks/t1' && options.method === 'PATCH') {
-        return { ok: true, status: 200, json: async () => ({ id: 't1', name: 'LF 10 Updated', seats: 6 }) }
+        return { ok: true, status: 200, json: async () => ({ id: 't1', name: 'LF 10 Updated', category: 'Trupp' }) }
       }
       if (url === '/api/trucks/t1' && options.method === 'DELETE') {
         return { ok: true, status: 200, json: async () => ({ success: true }) }
@@ -117,10 +117,10 @@ describe('ApiClient', () => {
     })
     global.fetch = mockFetch
 
-    const tCreated = await apiClient.createTruck({ name: 'LF 10', seats: 4 })
+    const tCreated = await apiClient.createTruck({ name: 'LF 10', category: 'Trupp' })
     expect(tCreated.id).toBe('t1')
 
-    const tUpdated = await apiClient.updateTruck('t1', { name: 'LF 10 Updated', seats: 6 })
+    const tUpdated = await apiClient.updateTruck('t1', { name: 'LF 10 Updated', category: 'Trupp' })
     expect(tUpdated.name).toBe('LF 10 Updated')
 
     const tDeleted = await apiClient.deleteTruck('t1')

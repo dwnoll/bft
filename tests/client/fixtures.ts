@@ -1,11 +1,11 @@
 import type { Alert, PublicState, Truck } from '../../src/shared/types'
 
 export const trucks: Truck[] = [
-  { id: 't1', name: 'ELF 1', seats: 2 },
-  { id: 't2', name: 'HLF 20', seats: 5 },
-  { id: 't3', name: 'LF 10', seats: 4 },
-  { id: 't4', name: 'TLF 16', seats: 5 },
-  { id: 't5', name: 'DLK 23', seats: 5 },
+  { id: 't1', name: 'ELF 1', category: 'Staffel' },
+  { id: 't2', name: 'HLF 20', category: 'Gruppe' },
+  { id: 't3', name: 'LF 10', category: 'Trupp' },
+  { id: 't4', name: 'TLF 16', category: 'Trupp' },
+  { id: 't5', name: 'DLK 23', category: 'Staffel' },
 ]
 
 export const activeAlert: Alert = {

@@ -61,21 +61,21 @@ describe('storage seeding', () => {
 describe('storage save', () => {
   it('writes atomically and persists for later load', async () => {
     const data = await load(file)
-    data.trucks.push({ id: 't1', name: 'New Truck', seats: 1 })
+    data.trucks.push({ id: 't1', name: 'New Truck', category: 'Trupp' })
 
     await save(file, data)
 
     const loaded = await load(file)
     expect(loaded.trucks).toHaveLength(6)
-    expect(loaded.trucks.find((t) => t.id === 't1')).toMatchObject({ name: 'New Truck', seats: 1 })
+    expect(loaded.trucks.find((t) => t.id === 't1')).toMatchObject({ name: 'New Truck', category: 'Trupp' })
   })
 
   it('serializes multiple rapid sequential saves without corruption', async () => {
     const data = await load(file)
 
-    const s1 = save(file, { ...data, trucks: [{ id: '1', name: 'A', seats: 1 }] })
-    const s2 = save(file, { ...data, trucks: [{ id: '2', name: 'B', seats: 1 }] })
-    const s3 = save(file, { ...data, trucks: [{ id: '3', name: 'C', seats: 1 }] })
+    const s1 = save(file, { ...data, trucks: [{ id: '1', name: 'A', category: 'Trupp' }] })
+    const s2 = save(file, { ...data, trucks: [{ id: '2', name: 'B', category: 'Staffel' }] })
+    const s3 = save(file, { ...data, trucks: [{ id: '3', name: 'C', category: 'Gruppe' }] })
 
     await Promise.all([s1, s2, s3])
 
