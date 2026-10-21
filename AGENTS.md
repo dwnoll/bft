@@ -1,5 +1,14 @@
 # AGENTS.md
 
+## Rules
+
+Read the following files at the begin of each new session and add the content to the context:
+
+- `/Users/dino/.config/opencode/rules/ask-general.md`
+- `/Users/dino/.config/opencode/rules/communication.md`
+- `/Users/dino/.config/opencode/rules/general.md`
+- `/Users/dino/.config/opencode/rules/communication.md`
+
 ## Current state
 
 Fully implemented. Express/TypeScript API in `src/server/`, React/MUI SPA in `src/client/`,

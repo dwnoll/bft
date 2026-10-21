@@ -41,7 +41,6 @@ describe('Dashboard', () => {
     expect(await screen.findByText('Musterstraße 5')).toBeInTheDocument()
     expect(screen.getByText('Wohnungsbrand')).toBeInTheDocument()
     expect(screen.getByText('Brandgeruch in Wohneinheit')).toBeInTheDocument()
-    expect(screen.getByText('Schlüssel beim Nachbarn')).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Einsatzmonitor' })).not.toBeInTheDocument()
 
     const cards = screen.getAllByTestId('truck-card')

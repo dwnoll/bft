@@ -19,6 +19,13 @@ export interface Alert {
   notes?: string
   truckIds: string[]
   status: AlertStatus
+  // Optional map position (decimal degrees). When both are present a map can be
+  // derived from the position (or from the address). null means "no position".
+  lat?: number | null
+  lng?: number | null
+  // Map zoom level, integer 14-17 (see shared/constants ZOOM_LABELS). Always a
+  // valid value; omits default to DEFAULT_ZOOM (15).
+  zoom?: number
   // epoch ms; set when a delayed trigger is armed
   triggerAt?: number
   // epoch ms; set when the alert goes active

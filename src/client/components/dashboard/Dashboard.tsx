@@ -8,6 +8,7 @@ import type { PublicState } from '../../../shared/types'
 import { useAlarmSound } from '../../hooks/useAlarmSound'
 import { useAppState } from '../../hooks/useAppState'
 import { COLOR_EMERGENCY } from '../../theme'
+import { LocationPanel } from '../common/LocationPanel'
 import { SoundToggle } from './SoundToggle'
 import { TruckGrid } from './TruckGrid'
 
@@ -21,7 +22,11 @@ function describeState(state: PublicState | null): string {
       .filter((t) => activeAlert.truckIds.includes(t.id))
       .map((t) => t.name)
       .join(', ')
-    return `Alarm: ${activeAlert.category}, ${activeAlert.address}. Fahrzeuge: ${names || 'keine'}.`
+    let msg = `Alarm: ${activeAlert.category}, ${activeAlert.address}. Fahrzeuge: ${names || 'keine'}.`
+    if (activeAlert.lat != null && activeAlert.lng != null) {
+      msg += ` Position: ${activeAlert.lat.toFixed(3)}, ${activeAlert.lng.toFixed(3)}.`
+    }
+    return msg
   }
   if (falseAlarmActive) return 'Fehlalarm.'
   return 'Kein aktiver Alarm.'
@@ -72,20 +77,36 @@ export function Dashboard() {
               aria-label="Aktiver Alarm"
               sx={{ bgcolor: COLOR_EMERGENCY, color: '#ffffff', p: { xs: 2, md: 4 }, mb: 3 }}
             >
-              <Typography component="h1" variant="h2">
-                {activeAlert.category}
-              </Typography>
-              <Typography variant="h3" component="p" sx={{ mt: 1 }}>
-                {activeAlert.address}
-              </Typography>
-              <Typography variant="h5" component="p" sx={{ mt: 1 }}>
-                {activeAlert.info}
-              </Typography>
-              {/* {activeAlert.notes && (
-                <Typography variant="h6" component="p" sx={{ mt: 1, opacity: 0.9 }}>
-                  {activeAlert.notes}
-                </Typography>
-              )} */}
+              <Box
+                sx={{
+                  display: 'flex',
+                  flexDirection: { xs: 'column', md: 'row' },
+                  gap: 3,
+                }}
+              >
+                <Box sx={{ flex: { xs: 'none', md: 1 } }}>
+                  <Typography component="h1" variant="h2">
+                    {activeAlert.category}
+                  </Typography>
+                  <Typography variant="h3" component="p" sx={{ mt: 1 }}>
+                    {activeAlert.address}
+                  </Typography>
+                  <Typography variant="h5" component="p" sx={{ mt: 1 }}>
+                    {activeAlert.info}
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', flex: { xs: 'none', md: 1 } }}>
+                  <LocationPanel
+                    title="Einsatzort"
+                    address={activeAlert.address}
+                    lat={activeAlert.lat}
+                    lng={activeAlert.lng}
+                    zoom={activeAlert.zoom}
+                    stretch
+                    centered
+                  />
+                </Box>
+              </Box>
             </Paper>
           ) : falseAlarm ? (
             <Paper

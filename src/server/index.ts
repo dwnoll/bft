@@ -29,7 +29,17 @@ export function createApp(engine: StateEngine, options: AppOptions = {}): Expres
   const app = express()
 
   // Security headers: clickjacking, XSS mitigation, content-type sniffing.
-  app.use(helmet())
+  // frame-src allows the embedded Google Maps iframe (LocationPanel) while
+  // the remaining default CSP directives stay in effect.
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          'frame-src': ['https://maps.google.com', 'https://www.google.com'],
+        },
+      },
+    }),
+  )
   app.use(express.json())
 
   // --- Public routes ---

@@ -12,7 +12,8 @@ export function createAlertsRouter(engine: StateEngine): Router {
   // POST /api/alerts — Create planned alert (PRD §6, §10)
   router.post('/alerts', (req, res, next) => {
     try {
-      const { name, category, address, info, notes, truckIds } = req.body || {}
+      const { name, category, address, info, notes, truckIds, lat, lng, zoom } =
+        req.body || {}
       const alert = engine.createAlert({
         name,
         category,
@@ -20,6 +21,9 @@ export function createAlertsRouter(engine: StateEngine): Router {
         info,
         notes,
         truckIds,
+        lat,
+        lng,
+        zoom,
       })
       res.status(201).json(alert)
     } catch (err) {
@@ -30,7 +34,8 @@ export function createAlertsRouter(engine: StateEngine): Router {
   // PATCH /api/alerts/:id — Update planned alert (PRD §6, §10)
   router.patch('/alerts/:id', (req, res, next) => {
     try {
-      const { name, category, address, info, notes, truckIds } = req.body || {}
+      const { name, category, address, info, notes, truckIds, lat, lng, zoom } =
+        req.body || {}
       const alert = engine.updateAlert(req.params.id, {
         name,
         category,
@@ -38,6 +43,9 @@ export function createAlertsRouter(engine: StateEngine): Router {
         info,
         notes,
         truckIds,
+        lat,
+        lng,
+        zoom,
       })
       res.json(alert)
     } catch (err) {

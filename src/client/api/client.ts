@@ -17,6 +17,9 @@ export interface CreateAlertInput {
   info: string
   notes?: string
   truckIds?: string[]
+  lat?: number
+  lng?: number
+  zoom?: number
 }
 
 export interface UpdateAlertInput {
@@ -26,6 +29,9 @@ export interface UpdateAlertInput {
   info?: string
   notes?: string
   truckIds?: string[]
+  lat?: number
+  lng?: number
+  zoom?: number
 }
 
 export interface UpdateSettingsInput {

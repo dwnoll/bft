@@ -2,8 +2,15 @@ import { ulid } from 'ulid'
 import type { Alert, DataFile, PendingTrigger, PublicState, Settings, Truck } from '../shared/types'
 import {
   AUTO_COMPLETE_MS,
+  DEFAULT_ZOOM,
   MAX_DELAY_MINUTES,
+  MAX_LATITUDE,
+  MAX_LONGITUDE,
+  MAX_ZOOM,
   MIN_DELAY_MINUTES,
+  MIN_LATITUDE,
+  MIN_LONGITUDE,
+  MIN_ZOOM,
 } from '../shared/constants'
 
 export const ALARM_ACTIVE_OR_PENDING = 'ALARM_ACTIVE_OR_PENDING'
@@ -84,6 +91,65 @@ export class StateEngine {
   }
 
   // --- helpers ---------------------------------------------------------------
+
+  /**
+   * Validate an optional manual coordinate ("lat, lng") and/or a zoom level.
+   * Throws ValidationError with a human-facing message on the first problem.
+   */
+  private validateLocation(
+    lat: unknown,
+    lng: unknown,
+    zoom: unknown,
+  ): { lat: number | null; lng: number | null; zoom: number } {
+    // Zoom: when supplied it must be an integer within the supported range.
+    let resolvedZoom: number
+    if (zoom !== undefined) {
+      const z = typeof zoom === 'number' ? zoom : Number(zoom)
+      if (!Number.isInteger(z) || z < MIN_ZOOM || z > MAX_ZOOM) {
+        throw new ValidationError(
+          `Zoom muss eine ganze Zahl zwischen ${MIN_ZOOM} und ${MAX_ZOOM} sein`,
+        )
+      }
+      resolvedZoom = z
+    } else {
+      // No zoom supplied: default to the canonical value.
+      resolvedZoom = DEFAULT_ZOOM
+    }
+
+    // Coordinates: when supplied they must be two numbers within the valid ranges.
+    let resolvedLat: number | null = null
+    let resolvedLng: number | null = null
+    if (lat !== undefined || lng !== undefined) {
+      const parsed = this.parseCoordinate(lat, lng)
+      if (parsed) {
+        resolvedLat = parsed.lat
+        resolvedLng = parsed.lng
+        if (
+          resolvedLat < MIN_LATITUDE ||
+          resolvedLat > MAX_LATITUDE ||
+          resolvedLng < MIN_LONGITUDE ||
+          resolvedLng > MAX_LONGITUDE
+        ) {
+          throw new ValidationError(
+            'Koordinaten liegen außerhalb des gültigen Bereichs',
+          )
+        }
+      }
+    }
+
+    return { lat: resolvedLat, lng: resolvedLng, zoom: resolvedZoom }
+  }
+
+  private parseCoordinate(
+    lat: unknown,
+    lng: unknown,
+  ): { lat: number; lng: number } | null {
+    // Exactly two numeric values, separated by a comma, optional whitespace.
+    if (lat === undefined || lng === undefined) return null
+    if (typeof lat !== 'number' || typeof lng !== 'number') return null
+    if (lat !== lat || lng !== lng) return null // NaN check
+    return { lat, lng }
+  }
 
   private findAlert(id: string): Alert {
     const alert = this.data.alerts.find((a) => a.id === id)
@@ -311,6 +377,9 @@ export class StateEngine {
     info?: unknown
     notes?: unknown
     truckIds?: unknown
+    lat?: unknown
+    lng?: unknown
+    zoom?: unknown
   }): Alert {
     if (typeof input.name !== 'string' || input.name.trim().length === 0) {
       throw new ValidationError('Alert name is required and cannot be empty')
@@ -337,6 +406,9 @@ export class StateEngine {
         ? input.notes.trim()
         : undefined
 
+    // Validate + normalize the optional position/zoom.
+    const { lat, lng, zoom } = this.validateLocation(input.lat, input.lng, input.zoom)
+
     const alert: Alert = {
       id: ulid(),
       name: input.name.trim(),
@@ -345,6 +417,9 @@ export class StateEngine {
       info: input.info.trim(),
       notes,
       truckIds,
+      lat,
+      lng,
+      zoom,
       status: 'pending',
     }
     this.data.alerts.push(alert)
@@ -362,6 +437,9 @@ export class StateEngine {
       info?: unknown
       notes?: unknown
       truckIds?: unknown
+      lat?: unknown
+      lng?: unknown
+      zoom?: unknown
     },
   ): Alert {
     const alert = this.findAlert(id)
@@ -401,6 +479,13 @@ export class StateEngine {
       }
       alert.truckIds = input.truckIds.filter((tid): tid is string => typeof tid === 'string')
     }
+
+    // Validate the optional position/zoom and only apply when explicitly changed.
+    const { lat, lng, zoom } = this.validateLocation(input.lat, input.lng, input.zoom)
+    alert.lat = input.lat === undefined ? alert.lat : lat
+    alert.lng = input.lng === undefined ? alert.lng : lng
+    alert.zoom = input.zoom === undefined ? alert.zoom : zoom
+
     this.schedulePersist()
     return alert
   }
