@@ -19,7 +19,7 @@ Web-application simulating the alarm system of a fire station (FFW). Supersedes
 Truck {
   id: string          // short ULID, server-generated
   name: string
-  seats: number
+  category: 'Gruppe' | 'Staffel' | 'Trupp'
 }
 
 Alert {
@@ -73,7 +73,7 @@ startup.
 ## 5. Admin: Trucks
 
 - Create / modify / delete trucks (5 seeded for layout).
-- Attributes: name, number of seats.
+- Attributes: name, category (one of `Gruppe`, `Staffel`, `Trupp`).
 - Deleting a truck removes it from every alert's `truckIds` silently (including
   alerts currently active — the dashboard simply shows the remaining trucks).
 
@@ -143,7 +143,8 @@ startup.
 
 `data.json` is created on first start if missing, seeded with:
 
-- Trucks: `ELF 1`, `HLF 20`, `LF 10`, `TLF 16`, `DLK 23` (seats: 2, 5, 4, 5, 5).
+- Trucks: `ELF 1` (Staffel), `HLF 20` (Gruppe), `LF 10` (Trupp), `TLF 16`
+  (Trupp), `DLK 23` (Staffel).
 - Alerts (both `pending`):
   1. `Wohnungsbrand` — category `Wohnungsbrand`, address `Musterstraße 5`, info
      `Brandgeruch in Wohneinheit`, trucks `ELF 1` + `HLF 20`.
@@ -179,4 +180,4 @@ startup.
 - Multiple users / roles beyond the single admin.
 - Historical logging / statistics.
 - Changeable credentials at runtime.
-- Truck attributes beyond name and seats.
+- Truck attributes beyond name and category.

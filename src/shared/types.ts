@@ -4,10 +4,12 @@
 
 export type AlertStatus = 'pending' | 'active' | 'complete'
 
+export type TruckCategory = 'Gruppe' | 'Staffel' | 'Trupp'
+
 export interface Truck {
   id: string
   name: string
-  seats: number
+  category: TruckCategory
 }
 
 export interface Alert {

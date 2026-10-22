@@ -27,7 +27,7 @@ describe('TruckManager', () => {
     const createSpy = vi.spyOn(apiClient, 'createTruck').mockResolvedValue({
       id: 't6',
       name: 'GW-L2',
-      seats: 6,
+      category: 'Trupp',
     })
     const onRefresh = vi.fn()
 
@@ -44,14 +44,14 @@ describe('TruckManager', () => {
     fireEvent.change(screen.getByLabelText(/Funkrufname \/ Name/i), {
       target: { value: 'GW-L2' },
     })
-    fireEvent.change(screen.getByLabelText(/Sitzplätze/i), {
-      target: { value: '6' },
+    fireEvent.change(screen.getByLabelText(/Kategorie/i), {
+      target: { value: 'Trupp' },
     })
 
     fireEvent.click(screen.getByRole('button', { name: 'Speichern' }))
 
     await waitFor(() => {
-      expect(createSpy).toHaveBeenCalledWith({ name: 'GW-L2', seats: 6 })
+      expect(createSpy).toHaveBeenCalledWith({ name: 'GW-L2', category: 'Trupp' })
       expect(onRefresh).toHaveBeenCalled()
     })
   })
@@ -60,7 +60,7 @@ describe('TruckManager', () => {
     const updateSpy = vi.spyOn(apiClient, 'updateTruck').mockResolvedValue({
       id: 't1',
       name: 'ELF 1 (Neu)',
-      seats: 3,
+      category: 'Staffel',
     })
     const onRefresh = vi.fn()
 
@@ -83,7 +83,7 @@ describe('TruckManager', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Speichern' }))
 
     await waitFor(() => {
-      expect(updateSpy).toHaveBeenCalledWith('t1', { name: 'ELF 1 (Neu)', seats: 2 })
+      expect(updateSpy).toHaveBeenCalledWith('t1', { name: 'ELF 1 (Neu)', category: 'Staffel' })
       expect(onRefresh).toHaveBeenCalled()
     })
   })

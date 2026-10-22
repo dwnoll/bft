@@ -31,7 +31,7 @@ function expectInvariantCode(fn: () => unknown, code: string): void {
 
 function baseData(): DataFile {
   return {
-    trucks: [{ id: 'trk-1', name: 'ELF 1', seats: 2 }],
+    trucks: [{ id: 'trk-1', name: 'ELF 1', category: 'Staffel' }],
     alerts: [
       {
         id: 'al-1',
@@ -289,8 +289,8 @@ describe('StateEngine truck management (R6, R14)', () => {
     const engine = new StateEngine(
       {
         trucks: [
-          { id: 't1', name: 'A', seats: 2 },
-          { id: 't2', name: 'B', seats: 5 },
+          { id: 't1', name: 'A', category: 'Trupp' },
+          { id: 't2', name: 'B', category: 'Staffel' },
         ],
         alerts: [
           { id: 'a1', name: 'A', category: 'C', address: 'x', info: 'y', truckIds: ['t1', 't2'], status: 'pending' },
@@ -322,18 +322,18 @@ describe('StateEngine truck management (R6, R14)', () => {
 
   it('creates and updates trucks with validation', () => {
     const engine = makeEngine()
-    const truck = engine.createTruck({ name: 'LF 20', seats: 9 })
+    const truck = engine.createTruck({ name: 'LF 20', category: 'Trupp' })
     expect(truck.id).toBeDefined()
     expect(truck.name).toBe('LF 20')
-    expect(truck.seats).toBe(9)
+    expect(truck.category).toBe('Trupp')
     expect(engine.trucks).toHaveLength(2)
 
-    const updated = engine.updateTruck(truck.id, { name: 'LF 20 KatS', seats: 8 })
+    const updated = engine.updateTruck(truck.id, { name: 'LF 20 KatS', category: 'Staffel' })
     expect(updated.name).toBe('LF 20 KatS')
-    expect(updated.seats).toBe(8)
+    expect(updated.category).toBe('Staffel')
 
-    expect(() => engine.createTruck({ name: '', seats: 2 })).toThrow(ValidationError)
-    expect(() => engine.createTruck({ name: 'Test', seats: -1 })).toThrow(ValidationError)
+    expect(() => engine.createTruck({ name: '', category: 'Trupp' })).toThrow(ValidationError)
+    expect(() => engine.createTruck({ name: 'Test', category: 'invalid' })).toThrow(ValidationError)
     expect(() => engine.updateTruck('non-existent', { name: 'X' })).toThrow(NotFoundError)
   })
 

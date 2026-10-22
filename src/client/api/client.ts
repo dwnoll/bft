@@ -1,13 +1,13 @@
-import type { Alert, Settings, Truck } from '../../shared/types'
+import type { Alert, Settings, Truck, TruckCategory } from '../../shared/types'
 
 export interface CreateTruckInput {
   name: string
-  seats: number
+  category: TruckCategory
 }
 
 export interface UpdateTruckInput {
   name?: string
-  seats?: number
+  category?: TruckCategory
 }
 
 export interface CreateAlertInput {

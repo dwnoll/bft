@@ -1,5 +1,8 @@
 import { ulid } from 'ulid'
-import type { Alert, AlertStatus, DataFile, Settings, Truck } from './types'
+import type { Alert, AlertStatus, DataFile, Settings, Truck, TruckCategory } from './types'
+
+// --- Truck categories (PRD §5) ---
+export const TRUCK_CATEGORIES: TruckCategory[] = ['Gruppe', 'Staffel', 'Trupp']
 
 // --- Lifecycle timing (R3, R17a, R11, R12, R15) ---
 export const TICK_INTERVAL_MS = 1000
@@ -37,11 +40,11 @@ export const MAX_LONGITUDE = 180
 // --- Seed data (PRD §11) ---
 export function seedTrucks(): Truck[] {
   return [
-    { id: ulid(), name: 'ELF 1', seats: 2 },
-    { id: ulid(), name: 'HLF 20', seats: 5 },
-    { id: ulid(), name: 'LF 10', seats: 4 },
-    { id: ulid(), name: 'TLF 16', seats: 5 },
-    { id: ulid(), name: 'DLK 23', seats: 5 },
+    { id: ulid(), name: 'ELF 1', category: 'Staffel' },
+    { id: ulid(), name: 'HLF 20', category: 'Gruppe' },
+    { id: ulid(), name: 'LF 10', category: 'Trupp' },
+    { id: ulid(), name: 'TLF 16', category: 'Trupp' },
+    { id: ulid(), name: 'DLK 23', category: 'Staffel' },
   ]
 }
 

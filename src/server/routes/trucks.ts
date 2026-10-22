@@ -12,8 +12,8 @@ export function createTrucksRouter(engine: StateEngine): Router {
   // POST /api/trucks — Create truck (PRD §5, §10)
   router.post('/trucks', (req, res, next) => {
     try {
-      const { name, seats } = req.body || {}
-      const truck = engine.createTruck({ name, seats })
+      const { name, category } = req.body || {}
+      const truck = engine.createTruck({ name, category })
       res.status(201).json(truck)
     } catch (err) {
       next(err)
@@ -23,8 +23,8 @@ export function createTrucksRouter(engine: StateEngine): Router {
   // PATCH /api/trucks/:id — Update truck (PRD §5, §10)
   router.patch('/trucks/:id', (req, res, next) => {
     try {
-      const { name, seats } = req.body || {}
-      const truck = engine.updateTruck(req.params.id, { name, seats })
+      const { name, category } = req.body || {}
+      const truck = engine.updateTruck(req.params.id, { name, category })
       res.json(truck)
     } catch (err) {
       next(err)
