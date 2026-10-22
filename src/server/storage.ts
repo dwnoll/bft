@@ -1,7 +1,7 @@
 import { rename, readFile, writeFile, mkdir, unlink } from 'node:fs/promises'
 import path from 'node:path'
 import { ulid } from 'ulid'
-import { defaultDataFile } from '../shared/constants'
+import { CREW_SLOTS, defaultDataFile } from '../shared/constants'
 import type { DataFile } from '../shared/types'
 
 // In-process serialization of writes so overlapping save calls cannot
@@ -87,15 +87,54 @@ export async function load(dataFile: string): Promise<DataFile> {
     throw new Error(`Invalid data.json structure at ${resolved}`)
   }
 
+  const data = parsed as DataFile
+
+  // Tolerate missing crew roster fields from pre-roster data.json files.
+  if (!Array.isArray(data.persons)) data.persons = []
+  if (!Array.isArray(data.rosters)) data.rosters = []
+  if (data.activeRosterId === undefined) data.activeRosterId = null
+
+  // Duplicate person name check — name is the identity key (crew_roster PRD §8).
+  const personNames = new Set<string>()
+  for (const p of data.persons) {
+    if (personNames.has(p.name)) {
+      throw new Error(`Duplicate person name in data.json: "${p.name}"`)
+    }
+    personNames.add(p.name)
+  }
+
   // Data integrity sweep: clear any orphaned triggerAt on non-pending alerts.
   // This prevents ghost slot lockout from partial writes or crashes (R3).
-  for (const alert of (parsed as DataFile).alerts) {
+  for (const alert of data.alerts) {
     if (alert.status !== 'pending' && alert.triggerAt !== undefined) {
       alert.triggerAt = undefined
     }
   }
 
-  return parsed
+  // Prune orphaned slot values (person name no longer in persons list) and
+  // unknown roles for the truck's current category (crew_roster PRD §8).
+  for (const roster of data.rosters) {
+    for (const [truckId, slots] of Object.entries(roster.assignments)) {
+      const truck = data.trucks.find((t) => t.id === truckId)
+      if (!truck) {
+        // Truck deleted — remove the entry entirely
+        delete roster.assignments[truckId]
+        continue
+      }
+      const validRoles = new Set(CREW_SLOTS[truck.category] ?? [])
+      for (const [role, personName] of Object.entries(slots)) {
+        if (!validRoles.has(role)) {
+          // Role no longer valid for this category
+          delete slots[role]
+        } else if (personName !== null && !personNames.has(personName)) {
+          // Orphaned person name — prune to null
+          slots[role] = null
+        }
+      }
+    }
+  }
+
+  return data
 }
 
 async function ensureSeeded(dataFile: string): Promise<void> {

@@ -40,10 +40,28 @@ export interface Settings {
   soundDurationSec: number
 }
 
+export interface Person {
+  name: string
+  excludedRoles: string[]
+}
+
+export interface Roster {
+  id: string
+  name: string
+  assignments: {
+    [truckId: string]: {
+      [role: string]: string | null
+    }
+  }
+}
+
 export interface DataFile {
   trucks: Truck[]
   alerts: Alert[]
   settings: Settings
+  persons: Person[]
+  rosters: Roster[]
+  activeRosterId: string | null
 }
 
 // Public dashboard payload returned by GET /api/state.
@@ -53,10 +71,16 @@ export interface PendingTrigger {
   countdownMs: number
 }
 
+export interface ActiveRosterSummary {
+  name: string
+  assignments: Roster['assignments']
+}
+
 export interface PublicState {
   activeAlert: Alert | null
   falseAlarmActive: boolean
   trucks: Truck[]
   settings: Settings
   pendingTrigger: PendingTrigger | null
+  activeRoster: ActiveRosterSummary | null
 }

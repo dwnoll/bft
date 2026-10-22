@@ -10,12 +10,13 @@ import Tabs from '@mui/material/Tabs'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { Alert as AlertType, Settings, Truck } from '../../../shared/types'
+import type { Alert as AlertType, Person, Roster, Settings, Truck } from '../../../shared/types'
 import { apiClient } from '../../api/client'
 import { COLOR_EMERGENCY } from '../../theme'
 import { ConfirmDialog } from '../common/ConfirmDialog'
 import { useToast } from '../common/ToastContainer'
 import { AlertManager } from './AlertManager'
+import { RosterManager } from './RosterManager'
 import { SettingsCard } from './SettingsCard'
 import { TruckManager } from './TruckManager'
 
@@ -49,6 +50,9 @@ export function AdminLayout({
   const [trucks, setTrucks] = useState<Truck[]>([])
   const [alerts, setAlerts] = useState<AlertType[]>([])
   const [settings, setSettings] = useState<Settings>({ soundDurationSec: 60 })
+  const [persons, setPersons] = useState<Person[]>([])
+  const [rosters, setRosters] = useState<Roster[]>([])
+  const [activeRosterId, setActiveRosterId] = useState<string | null>(null)
   // loading is always false (data loading is tracked per-operation via dedicated state).
   // Keeping as a constant to avoid prop-drilling refactor across child components.
   const loading = false
@@ -75,14 +79,19 @@ export function AdminLayout({
     if (!apiClient.isAuthenticated() || loadDataInFlight.current) return
     loadDataInFlight.current = true
     try {
-      const [fetchedTrucks, fetchedAlerts, fetchedSettings] = await Promise.all([
+      const [fetchedTrucks, fetchedAlerts, fetchedSettings, fetchedPersons, fetchedRosterData] = await Promise.all([
         apiClient.getTrucks(),
         apiClient.getAlerts(),
         apiClient.getSettings(),
+        apiClient.getPersons(),
+        apiClient.getRosters(),
       ])
       setTrucks(fetchedTrucks)
       setAlerts(fetchedAlerts)
       setSettings(fetchedSettings)
+      setPersons(fetchedPersons)
+      setRosters(fetchedRosterData.rosters)
+      setActiveRosterId(fetchedRosterData.activeRosterId)
     } catch (err) {
       if (err && typeof err === 'object' && 'status' in err && (err as { status: number }).status === 401) {
         setIsAuthenticated(false)
@@ -113,14 +122,19 @@ export function AdminLayout({
     try {
       apiClient.setCredentials(username, password)
       // Test credentials with an API request
-      const [fetchedTrucks, fetchedAlerts, fetchedSettings] = await Promise.all([
+      const [fetchedTrucks, fetchedAlerts, fetchedSettings, fetchedPersons, fetchedRosterData] = await Promise.all([
         apiClient.getTrucks(),
         apiClient.getAlerts(),
         apiClient.getSettings(),
+        apiClient.getPersons(),
+        apiClient.getRosters(),
       ])
       setTrucks(fetchedTrucks)
       setAlerts(fetchedAlerts)
       setSettings(fetchedSettings)
+      setPersons(fetchedPersons)
+      setRosters(fetchedRosterData.rosters)
+      setActiveRosterId(fetchedRosterData.activeRosterId)
       setIsAuthenticated(true)
       onAuthenticatedChange?.(true)
       showSuccess('Erfolgreich angemeldet')
@@ -263,6 +277,7 @@ export function AdminLayout({
         >
           <Tab label="Alarme & Übungen" sx={{ fontWeight: 600 }} />
           <Tab label="Fahrzeuge" sx={{ fontWeight: 600 }} />
+          <Tab label="Besatzung" sx={{ fontWeight: 600 }} />
         </Tabs>
       </Box>
 
@@ -285,6 +300,16 @@ export function AdminLayout({
 
       {tabIndex === 1 && (
         <TruckManager trucks={trucks} onRefresh={loadData} loading={loading} />
+      )}
+
+      {tabIndex === 2 && (
+        <RosterManager
+          rosters={rosters}
+          activeRosterId={activeRosterId}
+          persons={persons}
+          trucks={trucks}
+          onRefresh={loadData}
+        />
       )}
 
       {/* False Alarm Confirmation Dialog */}

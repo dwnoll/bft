@@ -12,6 +12,8 @@ import {
 import { authMiddleware } from './middleware/auth'
 import { createAlertsRouter } from './routes/alerts'
 import { createFalseAlertRouter } from './routes/falseAlert'
+import { createPersonsRouter } from './routes/persons'
+import { createRostersRouter } from './routes/rosters'
 import { createSettingsRouter } from './routes/settings'
 import { createStateRouter } from './routes/state'
 import { createTrucksRouter } from './routes/trucks'
@@ -54,6 +56,8 @@ export function createApp(engine: StateEngine, options: AppOptions = {}): Expres
   app.use('/api', authMiddleware, createAlertsRouter(engine))
   app.use('/api', authMiddleware, createFalseAlertRouter(engine))
   app.use('/api', authMiddleware, createSettingsRouter(engine))
+  app.use('/api', authMiddleware, createPersonsRouter(engine))
+  app.use('/api', authMiddleware, createRostersRouter(engine))
 
   // --- Static client SPA serving (PRD §1, §10) ---
   const staticDir = options.staticDir ?? path.resolve('dist/client')

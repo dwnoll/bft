@@ -1,7 +1,8 @@
 import { ulid } from 'ulid'
-import type { Alert, DataFile, PendingTrigger, PublicState, Settings, Truck, TruckCategory } from '../shared/types'
+import type { Alert, DataFile, PendingTrigger, Person, PublicState, Roster, Settings, Truck, TruckCategory } from '../shared/types'
 import {
   AUTO_COMPLETE_MS,
+  CREW_SLOTS,
   DEFAULT_ZOOM,
   MAX_DELAY_MINUTES,
   MAX_LATITUDE,
@@ -49,15 +50,18 @@ export class ValidationError extends EngineError {
 
 export type PersistFn = (data: DataFile) => Promise<void>
 export type ClockFn = () => number
+export type RngFn = () => number
 
 export interface StateEngineOptions {
   persist: PersistFn
   now: ClockFn
+  rng?: RngFn
 }
 
 export const DEFAULT_STATE_ENGINE_OPTIONS: StateEngineOptions = {
   persist: async () => {},
   now: () => Date.now(),
+  rng: () => Math.random(),
 }
 
 /**
@@ -76,7 +80,13 @@ export class StateEngine {
 
   constructor(data: DataFile, options: StateEngineOptions = DEFAULT_STATE_ENGINE_OPTIONS) {
     this._options = options
-    this.data = data
+    // Normalize data to handle pre-roster DataFile objects (e.g., from existing tests).
+    this.data = {
+      ...data,
+      persons: data.persons ?? [],
+      rosters: data.rosters ?? [],
+      activeRosterId: data.activeRosterId ?? null,
+    }
   }
 
   get trucks(): Truck[] {
@@ -89,6 +99,18 @@ export class StateEngine {
 
   get settings(): Settings {
     return this.data.settings
+  }
+
+  get persons(): Person[] {
+    return this.data.persons
+  }
+
+  get rosters(): Roster[] {
+    return this.data.rosters
+  }
+
+  get activeRosterId(): string | null {
+    return this.data.activeRosterId
   }
 
   // --- helpers ---------------------------------------------------------------
@@ -337,7 +359,8 @@ export class StateEngine {
     return truck
   }
 
-  /** Update an existing truck by id (PRD §5). */
+  /** Update an existing truck by id. When category changes, prune any roster
+   *  slots whose role is no longer in the new category's list (crew_roster PRD §2). */
   updateTruck(id: string, input: { name?: unknown; category?: unknown }): Truck {
     const truck = this.data.trucks.find((t) => t.id === id)
     if (!truck) {
@@ -350,13 +373,29 @@ export class StateEngine {
       truck.name = input.name.trim()
     }
     if (input.category !== undefined) {
-      truck.category = this.validateCategory(input.category)
+      const newCategory = this.validateCategory(input.category)
+      if (newCategory !== truck.category) {
+        // Prune roles no longer in the new category from all rosters.
+        const validRoles = new Set(CREW_SLOTS[newCategory])
+        for (const roster of this.data.rosters) {
+          const slots = roster.assignments[id]
+          if (slots) {
+            for (const role of Object.keys(slots)) {
+              if (!validRoles.has(role)) {
+                delete slots[role]
+              }
+            }
+          }
+        }
+        truck.category = newCategory
+      }
     }
     this.schedulePersist()
     return truck
   }
 
-  /** Remove a truck and silently strip it from every alert's truckIds. */
+  /** Remove a truck, strip it from every alert's truckIds, and remove its
+   *  assignments entry from all rosters (crew_roster PRD §2). */
   deleteTruck(truckId: string): Truck[] {
     const exists = this.data.trucks.some((t) => t.id === truckId)
     if (!exists) {
@@ -365,6 +404,9 @@ export class StateEngine {
     this.data.trucks = this.data.trucks.filter((t) => t.id !== truckId)
     for (const alert of this.data.alerts) {
       alert.truckIds = alert.truckIds.filter((id) => id !== truckId)
+    }
+    for (const roster of this.data.rosters) {
+      delete roster.assignments[truckId]
     }
     this.schedulePersist()
     return this.data.trucks
@@ -518,6 +560,197 @@ export class StateEngine {
     return this.data.settings
   }
 
+  // --- roster management -----------------------------------------------------
+
+  private findRoster(id: string): Roster {
+    const roster = this.data.rosters.find((r) => r.id === id)
+    if (!roster) throw new NotFoundError(id)
+    return roster
+  }
+
+  /** Validate and normalise incoming assignments input.
+   *  - Unknown truckIds are pruned silently.
+   *  - Unknown role or unknown person name → ValidationError.
+   *  - Person used more than once in the same roster → ValidationError.
+   *  - Excluded-role assignment → ValidationError.
+   */
+  private validateAssignments(
+    assignments: unknown,
+  ): Roster['assignments'] {
+    if (assignments === undefined || assignments === null) return {}
+    if (typeof assignments !== 'object' || Array.isArray(assignments)) {
+      throw new ValidationError('assignments must be an object')
+    }
+    const raw = assignments as Record<string, unknown>
+    const result: Roster['assignments'] = {}
+    const usedPersons = new Set<string>()
+
+    for (const [truckId, slotsRaw] of Object.entries(raw)) {
+      // Prune unknown truckIds silently.
+      const truck = this.data.trucks.find((t) => t.id === truckId)
+      if (!truck) continue
+
+      if (typeof slotsRaw !== 'object' || slotsRaw === null || Array.isArray(slotsRaw)) {
+        throw new ValidationError(`assignments.${truckId} must be an object`)
+      }
+      const slotsIn = slotsRaw as Record<string, unknown>
+      const validRoles = new Set(CREW_SLOTS[truck.category])
+      const truckSlots: Record<string, string | null> = {}
+
+      for (const [role, personNameRaw] of Object.entries(slotsIn)) {
+        if (!validRoles.has(role)) {
+          throw new ValidationError(`Unbekannte Rolle "${role}" für Fahrzeugkategorie ${truck.category}`)
+        }
+        if (personNameRaw === null) {
+          truckSlots[role] = null
+          continue
+        }
+        if (typeof personNameRaw !== 'string') {
+          throw new ValidationError(`Slot-Wert für ${role} muss ein Name oder null sein`)
+        }
+        const person = this.data.persons.find((p) => p.name === personNameRaw)
+        if (!person) {
+          throw new ValidationError(`Person "${personNameRaw}" nicht gefunden`)
+        }
+        if (person.excludedRoles.includes(role)) {
+          throw new ValidationError('Person ist für diese Rolle ausgeschlossen')
+        }
+        if (usedPersons.has(personNameRaw)) {
+          throw new ValidationError('Person ist bereits in einem anderen Slot zugewiesen')
+        }
+        usedPersons.add(personNameRaw)
+        truckSlots[role] = personNameRaw
+      }
+      result[truckId] = truckSlots
+    }
+    return result
+  }
+
+  /** Create a new roster (crew_roster PRD §6). */
+  createRoster(input: { name?: unknown; assignments?: unknown }): Roster {
+    if (typeof input.name !== 'string' || input.name.trim().length === 0) {
+      throw new ValidationError('Bezeichnung ist erforderlich')
+    }
+    const assignments = this.validateAssignments(input.assignments)
+    const roster: Roster = {
+      id: ulid(),
+      name: input.name.trim(),
+      assignments,
+    }
+    this.data.rosters.push(roster)
+    this.schedulePersist()
+    return roster
+  }
+
+  /** Update an existing roster (crew_roster PRD §6). */
+  updateRoster(id: string, input: { name?: unknown; assignments?: unknown }): Roster {
+    const roster = this.findRoster(id)
+    if (input.name !== undefined) {
+      if (typeof input.name !== 'string' || input.name.trim().length === 0) {
+        throw new ValidationError('Bezeichnung ist erforderlich')
+      }
+      roster.name = input.name.trim()
+    }
+    if (input.assignments !== undefined) {
+      roster.assignments = this.validateAssignments(input.assignments)
+    }
+    this.schedulePersist()
+    return roster
+  }
+
+  /** Delete a roster. Clears activeRosterId if it was the active one. */
+  deleteRoster(id: string): void {
+    const exists = this.data.rosters.some((r) => r.id === id)
+    if (!exists) throw new NotFoundError(id)
+    this.data.rosters = this.data.rosters.filter((r) => r.id !== id)
+    if (this.data.activeRosterId === id) {
+      this.data.activeRosterId = null
+    }
+    this.schedulePersist()
+  }
+
+  /** Activate a roster (single-active invariant via activeRosterId). */
+  activateRoster(id: string): { rosters: Roster[]; activeRosterId: string | null } {
+    const exists = this.data.rosters.some((r) => r.id === id)
+    if (!exists) throw new NotFoundError(id)
+    this.data.activeRosterId = id
+    this.schedulePersist()
+    return { rosters: this.data.rosters, activeRosterId: this.data.activeRosterId }
+  }
+
+  /** Deactivate the current active roster. */
+  deactivateRoster(): { rosters: Roster[]; activeRosterId: string | null } {
+    this.data.activeRosterId = null
+    this.schedulePersist()
+    return { rosters: this.data.rosters, activeRosterId: null }
+  }
+
+  /** Random assignment: best-effort fill of all slots in a roster.
+   *  Returns { roster, assigned, unassigned }.
+   *  Uses the injected rng for deterministic testability. */
+  randomAssign(rosterId: string): { roster: Roster; assigned: number; unassigned: string[] } {
+    const roster = this.findRoster(rosterId)
+    const rng = this._options.rng ?? Math.random
+
+    // 1. Clear all slots.
+    roster.assignments = {}
+
+    // Build work structures.
+    // unassignedPersons: names of all persons not yet placed.
+    const unassignedPersons = new Set(this.data.persons.map((p) => p.name))
+    // truckSlots[truckId] = list of free roles remaining
+    const truckFreeSlots: Map<string, string[]> = new Map()
+    for (const truck of this.data.trucks) {
+      truckFreeSlots.set(truck.id, [...CREW_SLOTS[truck.category]])
+    }
+
+    let progressed = true
+    while (progressed) {
+      progressed = false
+
+      // Trucks that still have free slots.
+      const freeTrucks = this.data.trucks.filter((t) => (truckFreeSlots.get(t.id)?.length ?? 0) > 0)
+      if (freeTrucks.length === 0) break
+
+      // Pick a random truck.
+      const truck = freeTrucks[Math.floor(rng() * freeTrucks.length)]
+      const freeRoles = truckFreeSlots.get(truck.id)!
+
+      // Persons eligible for at least one free role on this truck.
+      const eligible = [...unassignedPersons].filter((name) => {
+        const person = this.data.persons.find((p) => p.name === name)!
+        return freeRoles.some((role) => !person.excludedRoles.includes(role))
+      })
+      if (eligible.length === 0) {
+        // No eligible person for this truck — remove it from consideration.
+        truckFreeSlots.set(truck.id, [])
+        continue
+      }
+
+      // Pick a random eligible person.
+      const personName = eligible[Math.floor(rng() * eligible.length)]
+      const person = this.data.persons.find((p) => p.name === personName)!
+
+      // Pick a random free non-excluded role for this person.
+      const candidateRoles = freeRoles.filter((role) => !person.excludedRoles.includes(role))
+      const role = candidateRoles[Math.floor(rng() * candidateRoles.length)]
+
+      // Assign.
+      if (!roster.assignments[truck.id]) roster.assignments[truck.id] = {}
+      roster.assignments[truck.id][role] = personName
+
+      // Remove the role from the free slots of this truck.
+      truckFreeSlots.set(truck.id, freeRoles.filter((r) => r !== role))
+      unassignedPersons.delete(personName)
+      progressed = true
+    }
+
+    const assigned = this.data.persons.length - unassignedPersons.size
+    const unassigned = [...unassignedPersons]
+    this.schedulePersist()
+    return { roster, assigned, unassigned }
+  }
+
   // --- read model ------------------------------------------------------------
 
   /** Public dashboard payload (no authentication). */
@@ -529,12 +762,21 @@ export class StateEngine {
       ? { id: pending.id, countdownMs: Math.max(0, pending.triggerAt! - n) }
       : null
 
+    let activeRoster: PublicState['activeRoster'] = null
+    if (this.data.activeRosterId !== null) {
+      const ar = this.data.rosters.find((r) => r.id === this.data.activeRosterId)
+      if (ar) {
+        activeRoster = { name: ar.name, assignments: ar.assignments }
+      }
+    }
+
     return {
       activeAlert: active,
       falseAlarmActive: this.falseAlarmActiveSince !== null,
       trucks: this.data.trucks,
       settings: this.data.settings,
       pendingTrigger,
+      activeRoster,
     }
   }
 }

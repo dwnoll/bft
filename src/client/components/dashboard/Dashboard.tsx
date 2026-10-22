@@ -125,7 +125,7 @@ export function Dashboard() {
             </Box>
           )}
 
-          <TruckGrid trucks={state.trucks} highlightedIds={highlightedIds} />
+          <TruckGrid trucks={state.trucks} highlightedIds={highlightedIds} activeRoster={state.activeRoster} />
         </>
       )}
     </Container>

@@ -1,8 +1,15 @@
 import { ulid } from 'ulid'
-import type { Alert, AlertStatus, DataFile, Settings, Truck, TruckCategory } from './types'
+import type { Alert, AlertStatus, DataFile, Person, Settings, Truck, TruckCategory } from './types'
 
 // --- Truck categories (PRD §5) ---
 export const TRUCK_CATEGORIES: TruckCategory[] = ['Gruppe', 'Staffel', 'Trupp']
+
+// --- Crew slot lists per truck category (crew_roster PRD §1) ---
+export const CREW_SLOTS: Record<TruckCategory, string[]> = {
+  Gruppe: ['GF', 'MA', 'ME', 'AF', 'AM', 'WF', 'WM', 'SF', 'SM'],
+  Staffel: ['SF', 'MA', 'AF', 'AM', 'WF', 'WM'],
+  Trupp: ['MA', 'MF', 'TM'],
+}
 
 // --- Lifecycle timing (R3, R17a, R11, R12, R15) ---
 export const TICK_INTERVAL_MS = 1000
@@ -89,11 +96,40 @@ export function seedSettings(): Settings {
   return { soundDurationSec: 60 }
 }
 
+export function seedPersons(): Person[] {
+  const names = [
+    'Berger Anna',
+    'Brunner Lukas',
+    'Gruber Stefan',
+    'Hofer Petra',
+    'Kramreiter Jonas',
+    'Leitner Sandra',
+    'Maier Thomas',
+    'Mooslechner Eva',
+    'Oberleitner Felix',
+    'Pichler Regina',
+    'Rabl Markus',
+    'Schuster Ingrid',
+    'Steiner Wolfgang',
+    'Unterberger Katja',
+    'Watzke Roland',
+    'Zeilinger Miriam',
+    'Aigner Paul',
+    'Bachmeier Sonja',
+    'Fessler Dietmar',
+    'Gstrein Verena',
+  ]
+  return names.map((name) => ({ name, excludedRoles: [] }))
+}
+
 export function defaultDataFile(): DataFile {
   const trucks = seedTrucks()
   return {
     trucks,
     alerts: seedAlerts(trucks),
     settings: seedSettings(),
+    persons: seedPersons(),
+    rosters: [],
+    activeRosterId: null,
   }
 }
