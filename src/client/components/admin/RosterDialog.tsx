@@ -5,6 +5,8 @@ import {
   TouchSensor,
   useSensor,
   useSensors,
+  useDraggable,
+  useDroppable,
   type DragEndEvent,
   type DragStartEvent,
 } from '@dnd-kit/core'
@@ -38,6 +40,10 @@ function encodePoolId(personName: string): string {
   return `pool:${personName}`
 }
 
+// The unassigned pool is a drop target (droppable) so persons can be dragged
+// back from a slot to unassign them.
+const POOL_DROP_ID = 'pool:__pool__'
+
 function decodeId(id: string): { type: 'slot'; truckId: string; role: string } | { type: 'pool'; name: string } | null {
   if (id.startsWith('slot:')) {
     const parts = id.slice(5).split(':')
@@ -56,14 +62,11 @@ function decodeId(id: string): { type: 'slot'; truckId: string; role: string } |
 interface PersonChipProps {
   personName: string
   dragging?: boolean
-  style?: React.CSSProperties
-  dragHandleProps?: Record<string, unknown>
 }
 
-function PersonChip({ personName, dragging, style, dragHandleProps }: PersonChipProps) {
+function PersonChip({ personName, dragging }: PersonChipProps) {
   return (
     <Box
-      {...dragHandleProps}
       data-testid={`person-chip-${personName}`}
       sx={{
         display: 'inline-flex',
@@ -75,10 +78,8 @@ function PersonChip({ personName, dragging, style, dragHandleProps }: PersonChip
         color: '#fff',
         fontSize: '0.82rem',
         fontWeight: 600,
-        cursor: 'grab',
         userSelect: 'none',
-        opacity: dragging ? 0.8 : 1,
-        ...style,
+        opacity: dragging ? 0.9 : 1,
       }}
     >
       {personName}
@@ -86,21 +87,82 @@ function PersonChip({ personName, dragging, style, dragHandleProps }: PersonChip
   )
 }
 
-// ---- SlotCell — a droppable/draggable slot ---------------------------------
+/**
+ * A person chip registered as a dnd-kit draggable. Renders the original chip;
+ * while dragging, the original fades out and the <DragOverlay> copy follows the
+ * pointer.
+ */
+interface DraggablePersonProps {
+  id: string
+  personName: string
+  testId?: string
+}
+
+function DraggablePerson({ id, personName, testId }: DraggablePersonProps) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id })
+  return (
+    <Box
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      data-testid={testId}
+      sx={{
+        display: 'inline-flex',
+        cursor: 'grab',
+        touchAction: 'none',
+        userSelect: 'none',
+        opacity: isDragging ? 0 : 1,
+      }}
+    >
+      <PersonChip personName={personName} />
+    </Box>
+  )
+}
+
+/** A box registered as a dnd-kit droppable, used for the unassigned pool. */
+interface PoolDropZoneProps {
+  isOver?: boolean
+  children: React.ReactNode
+}
+
+function PoolDropZone({ isOver, children }: PoolDropZoneProps) {
+  const { setNodeRef, isOver: droppableIsOver } = useDroppable({ id: POOL_DROP_ID })
+  const highlighted = isOver || droppableIsOver
+  return (
+    <Box
+      ref={setNodeRef}
+      data-testid="unassigned-pool"
+      sx={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: 1,
+        minHeight: 40,
+        p: 1,
+        border: '1px dashed',
+        borderColor: highlighted ? 'primary.main' : 'divider',
+        borderRadius: 1,
+      }}
+    >
+      {children}
+    </Box>
+  )
+}
+
+// ---- SlotCell — a droppable slot containing a draggable person -------------
 interface SlotCellProps {
   truckId: string
   role: string
   personName: string | null | undefined
   isDraggingOver?: boolean
-  onDragStart?: (truckId: string, role: string) => void
 }
 
 function SlotCell({ truckId, role, personName, isDraggingOver }: SlotCellProps) {
   const id = encodeSlotId(truckId, role)
-  // We render as a drop target visually; actual DnD is managed by parent
+  const { setNodeRef, isOver } = useDroppable({ id })
+  const highlighted = isDraggingOver || isOver
   return (
     <Box
-      data-droppable-id={id}
+      ref={setNodeRef}
       data-testid={`slot-${truckId}-${role}`}
       sx={{
         display: 'flex',
@@ -111,8 +173,8 @@ function SlotCell({ truckId, role, personName, isDraggingOver }: SlotCellProps) 
         py: 0.5,
         borderRadius: 1,
         border: '1px solid',
-        borderColor: isDraggingOver ? 'primary.main' : 'divider',
-        bgcolor: isDraggingOver ? 'primary.50' : 'background.paper',
+        borderColor: highlighted ? 'primary.main' : 'divider',
+        bgcolor: highlighted ? 'primary.50' : 'background.paper',
         mb: 0.5,
       }}
     >
@@ -120,13 +182,11 @@ function SlotCell({ truckId, role, personName, isDraggingOver }: SlotCellProps) 
         {role}
       </Typography>
       {personName ? (
-        <Box
-          data-draggable-id={encodeSlotId(truckId, role)}
-          data-testid={`draggable-slot-${truckId}-${role}`}
-          sx={{ cursor: 'grab' }}
-        >
-          <PersonChip personName={personName} />
-        </Box>
+        <DraggablePerson
+          id={id}
+          personName={personName}
+          testId={`draggable-slot-${truckId}-${role}`}
+        />
       ) : (
         <Typography variant="caption" sx={{ color: 'text.disabled', fontStyle: 'italic' }}>
           –
@@ -237,10 +297,26 @@ export function RosterDialog({ open, roster, persons, trucks, onClose }: RosterD
     }
     if (!sourcePerson) return
 
-    // Target must be a slot
-    if (targetDecoded.type !== 'slot') return
+    // slot → pool: unassign the person from their slot (pool → pool is a no-op)
+    if (targetDecoded.type === 'pool') {
+      if (sourceDecoded.type === 'slot') {
+        setSlot(sourceDecoded.truckId, sourceDecoded.role, null)
+      }
+      return
+    }
+
+    // The remaining target type is a slot
     const targetTruckId = targetDecoded.truckId
     const targetRole = targetDecoded.role
+
+    // Dropping a person back onto their own slot is a no-op
+    if (
+      sourceDecoded.type === 'slot' &&
+      sourceDecoded.truckId === targetTruckId &&
+      sourceDecoded.role === targetRole
+    ) {
+      return
+    }
 
     // Client-side exclusion check (server is authoritative)
     const person = persons.find((p) => p.name === sourcePerson)
@@ -252,21 +328,17 @@ export function RosterDialog({ open, roster, persons, trucks, onClose }: RosterD
     const existingInTarget = getSlot(targetTruckId, targetRole)
 
     if (sourceDecoded.type === 'slot') {
-      // slot → slot: swap if occupied, move if empty
+      // slot → slot: swap if target occupied, move if empty
       if (existingInTarget) {
-        // swap
         setSlot(sourceDecoded.truckId, sourceDecoded.role, existingInTarget)
         setSlot(targetTruckId, targetRole, sourcePerson)
       } else {
-        // move
         setSlot(sourceDecoded.truckId, sourceDecoded.role, null)
         setSlot(targetTruckId, targetRole, sourcePerson)
       }
     } else {
-      // pool → slot: assign (if occupied, bump the current occupant back to pool by nulling)
-      if (existingInTarget) {
-        setSlot(targetTruckId, targetRole, null)
-      }
+      // pool → slot: assign. A person already in the target slot is bumped back
+      // to the pool automatically (the pool derives from unassigned persons).
       setSlot(targetTruckId, targetRole, sourcePerson)
     }
   }
@@ -415,26 +487,21 @@ export function RosterDialog({ open, roster, persons, trucks, onClose }: RosterD
                 <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
                   Nicht zugewiesen ({unassignedPersons.length})
                 </Typography>
-                <Box
-                  data-testid="unassigned-pool"
-                  data-droppable-id="pool:__pool__"
-                  sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, minHeight: 40, p: 1, border: '1px dashed', borderColor: 'divider', borderRadius: 1 }}
-                >
+                <PoolDropZone isOver={overDroppableId === POOL_DROP_ID}>
                   {unassignedPersons.map((p) => (
-                    <Box
+                    <DraggablePerson
                       key={p.name}
-                      data-draggable-id={encodePoolId(p.name)}
-                      data-testid={`pool-person-${p.name}`}
-                    >
-                      <PersonChip personName={p.name} />
-                    </Box>
+                      id={encodePoolId(p.name)}
+                      personName={p.name}
+                      testId={`pool-person-${p.name}`}
+                    />
                   ))}
                   {unassignedPersons.length === 0 && (
                     <Typography variant="caption" sx={{ color: 'text.disabled', fontStyle: 'italic' }}>
                       Alle Personen zugewiesen
                     </Typography>
                   )}
-                </Box>
+                </PoolDropZone>
               </Box>
 
               <DragOverlay>

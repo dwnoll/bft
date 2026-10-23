@@ -1,5 +1,5 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { apiClient } from '../../src/client/api/client'
 import { RosterDialog } from '../../src/client/components/admin/RosterDialog'
 import { ToastProvider } from '../../src/client/components/common/ToastContainer'
@@ -237,5 +237,146 @@ describe('RosterDialog — edit mode', () => {
     await waitFor(() => {
       expect(randomSpy).toHaveBeenCalledWith('r1')
     })
+  })
+})
+
+// ---- Drag and drop ---------------------------------------------------------
+//
+// dnd-kit resolves the drop target from element bounding rects
+// (default strategy: rectIntersection). jsdom reports zero-size rects, which
+// would never intersect, so we mock Element.prototype.getBoundingClientRect:
+// every element gets a 100x100 base rect at the origin (giving the dragging
+// node area), and only the intended target droppable (by data-testid) is
+// placed at (100,100)–(200,200). The pointer then finishes at (150,150),
+// inside the target but outside every other droppable.
+
+function makeRect(top: number, left: number, width: number, height: number): DOMRect {
+  return {
+    top,
+    left,
+    right: left + width,
+    bottom: top + height,
+    width,
+    height,
+    x: left,
+    y: top,
+    toJSON: () => ({}),
+  } as DOMRect
+}
+
+/** Mock element rects so only `targetTestId` is under the drop point. */
+function mockRectsFor(targetTestId: string): () => void {
+  const original = Element.prototype.getBoundingClientRect
+  const baseRect = makeRect(0, 0, 100, 100)
+  const targetRect = makeRect(100, 100, 100, 100)
+  Element.prototype.getBoundingClientRect = function (this: Element) {
+    const testId = typeof this.getAttribute === 'function' ? this.getAttribute('data-testid') : null
+    return testId === targetTestId ? targetRect : baseRect
+  }
+  return () => {
+    Element.prototype.getBoundingClientRect = original
+  }
+}
+
+/**
+ * Simulate a pointer drag on `source` (pointerdown → activate → move to drop
+ * point → pointerup). dnd-kit attaches its move/up listeners to the pointerdown
+ * target element, so all events are fired on `source`.
+ */
+function simulateDrag(source: HTMLElement, dropX = 150, dropY = 150): void {
+  fireEvent.pointerDown(source, { clientX: 10, clientY: 10, pointerId: 1 })
+  // Move >4px to pass the activation constraint
+  fireEvent.pointerMove(source, { clientX: 16, clientY: 16, pointerId: 1 })
+  // Move over the mocked target droppable
+  fireEvent.pointerMove(source, { clientX: dropX, clientY: dropY, pointerId: 1 })
+  fireEvent.pointerUp(source, { pointerId: 1 })
+}
+
+const dndPersons: Person[] = [
+  { name: 'Alice', excludedRoles: [] },
+  { name: 'Bob', excludedRoles: ['GF'] },
+  { name: 'Carol', excludedRoles: [] },
+]
+
+function renderDndDialog(roster: Roster | null, persons: Person[] = dndPersons) {
+  render(
+    <ToastProvider>
+      <RosterDialog open roster={roster} persons={persons} trucks={trucks} onClose={vi.fn()} />
+    </ToastProvider>,
+  )
+}
+
+describe('RosterDialog — drag and drop', () => {
+  let restoreRects: (() => void) | undefined
+
+  afterEach(() => {
+    restoreRects?.()
+    restoreRects = undefined
+    vi.restoreAllMocks()
+  })
+
+  it('assigns a person from the pool to an empty slot (pool → slot)', () => {
+    renderDndDialog(null)
+    restoreRects = mockRectsFor('slot-trk-gruppe-MA')
+
+    simulateDrag(screen.getByTestId('pool-person-Alice'))
+
+    expect(screen.getByTestId('slot-trk-gruppe-MA')).toHaveTextContent('Alice')
+    expect(screen.queryByTestId('pool-person-Alice')).not.toBeInTheDocument()
+  })
+
+  it('blocks dropping a person onto an excluded role', async () => {
+    renderDndDialog(null)
+    restoreRects = mockRectsFor('slot-trk-gruppe-GF')
+
+    simulateDrag(screen.getByTestId('pool-person-Bob'))
+
+    expect(screen.queryByTestId('draggable-slot-trk-gruppe-GF')).not.toBeInTheDocument()
+    expect(screen.getByTestId('pool-person-Bob')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByText(/ausgeschlossen/i)).toBeInTheDocument()
+    })
+  })
+
+  it('moves a person from an occupied slot to an empty slot (slot → slot move)', () => {
+    renderDndDialog({
+      id: 'r1',
+      name: 'Schicht A',
+      assignments: { 'trk-gruppe': { GF: 'Alice' } },
+    })
+    restoreRects = mockRectsFor('slot-trk-gruppe-MA')
+
+    simulateDrag(screen.getByTestId('draggable-slot-trk-gruppe-GF'))
+
+    expect(screen.getByTestId('slot-trk-gruppe-MA')).toHaveTextContent('Alice')
+    expect(screen.queryByTestId('draggable-slot-trk-gruppe-GF')).not.toBeInTheDocument()
+  })
+
+  it('swaps two persons between occupied slots (slot → slot swap)', () => {
+    renderDndDialog({
+      id: 'r1',
+      name: 'Schicht A',
+      assignments: { 'trk-gruppe': { GF: 'Alice', MA: 'Carol' } },
+    })
+    restoreRects = mockRectsFor('slot-trk-gruppe-MA')
+
+    simulateDrag(screen.getByTestId('draggable-slot-trk-gruppe-GF'))
+
+    expect(screen.getByTestId('slot-trk-gruppe-MA')).toHaveTextContent('Alice')
+    expect(screen.getByTestId('slot-trk-gruppe-GF')).toHaveTextContent('Carol')
+  })
+
+  it('unassigns a person by dragging them back to the pool (slot → pool)', () => {
+    renderDndDialog({
+      id: 'r1',
+      name: 'Schicht A',
+      assignments: { 'trk-gruppe': { GF: 'Alice' } },
+    })
+    restoreRects = mockRectsFor('unassigned-pool')
+
+    simulateDrag(screen.getByTestId('draggable-slot-trk-gruppe-GF'))
+
+    expect(screen.queryByTestId('draggable-slot-trk-gruppe-GF')).not.toBeInTheDocument()
+    expect(screen.getByTestId('pool-person-Alice')).toBeInTheDocument()
   })
 })
