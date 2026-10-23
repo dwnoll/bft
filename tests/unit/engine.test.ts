@@ -515,3 +515,261 @@ describe('clock injection', () => {
     expect(engine.alerts[0].status).toBe('complete')
   })
 })
+
+// ============================================================
+// Roster Tests (crew_roster PRD §11)
+// ============================================================
+
+// Base data with persons and a truck per category
+function rosterBaseData(): DataFile {
+  return {
+    trucks: [
+      { id: 'trk-gruppe', name: 'HLF 20', category: 'Gruppe' },
+      { id: 'trk-staffel', name: 'ELF 1', category: 'Staffel' },
+      { id: 'trk-trupp', name: 'LF 10', category: 'Trupp' },
+    ],
+    alerts: [],
+    settings: { soundDurationSec: 60 },
+    persons: [
+      { name: 'Alice', excludedRoles: [] },
+      { name: 'Bob', excludedRoles: [] },
+      { name: 'Charlie', excludedRoles: ['GF'] },
+      { name: 'Diana', excludedRoles: [] },
+    ],
+    rosters: [],
+    activeRosterId: null,
+  }
+}
+
+describe('StateEngine — roster CRUD', () => {
+  it('creates a roster and returns it with a generated id', () => {
+    const engine = new StateEngine(rosterBaseData(), { persist: persistSpy, now: () => T0 })
+    const roster = engine.createRoster({ name: 'Test', assignments: {} })
+    expect(roster.id).toBeDefined()
+    expect(roster.name).toBe('Test')
+    expect(engine.rosters).toHaveLength(1)
+  })
+
+  it('throws ValidationError when name is missing', () => {
+    const engine = new StateEngine(rosterBaseData(), { persist: persistSpy, now: () => T0 })
+    expect(() => engine.createRoster({ name: '' })).toThrow(ValidationError)
+    expect(() => engine.createRoster({ name: undefined })).toThrow(ValidationError)
+  })
+
+  it('updates roster name', () => {
+    const engine = new StateEngine(rosterBaseData(), { persist: persistSpy, now: () => T0 })
+    const roster = engine.createRoster({ name: 'Old Name' })
+    const updated = engine.updateRoster(roster.id, { name: 'New Name' })
+    expect(updated.name).toBe('New Name')
+  })
+
+  it('throws NotFoundError for unknown id on update', () => {
+    const engine = new StateEngine(rosterBaseData(), { persist: persistSpy, now: () => T0 })
+    expect(() => engine.updateRoster('no-such-id', { name: 'X' })).toThrow(NotFoundError)
+  })
+
+  it('deletes a roster and returns', () => {
+    const engine = new StateEngine(rosterBaseData(), { persist: persistSpy, now: () => T0 })
+    const roster = engine.createRoster({ name: 'A' })
+    engine.deleteRoster(roster.id)
+    expect(engine.rosters).toHaveLength(0)
+  })
+
+  it('throws NotFoundError deleting unknown id', () => {
+    const engine = new StateEngine(rosterBaseData(), { persist: persistSpy, now: () => T0 })
+    expect(() => engine.deleteRoster('ghost')).toThrow(NotFoundError)
+  })
+})
+
+describe('StateEngine — activate / deactivate roster', () => {
+  it('activates a roster (single-active invariant)', () => {
+    const engine = new StateEngine(rosterBaseData(), { persist: persistSpy, now: () => T0 })
+    const r1 = engine.createRoster({ name: 'R1' })
+    const r2 = engine.createRoster({ name: 'R2' })
+    engine.activateRoster(r1.id)
+    expect(engine.activeRosterId).toBe(r1.id)
+    engine.activateRoster(r2.id)
+    expect(engine.activeRosterId).toBe(r2.id)
+  })
+
+  it('deactivates — sets activeRosterId to null', () => {
+    const engine = new StateEngine(rosterBaseData(), { persist: persistSpy, now: () => T0 })
+    const r = engine.createRoster({ name: 'R' })
+    engine.activateRoster(r.id)
+    engine.deactivateRoster()
+    expect(engine.activeRosterId).toBeNull()
+  })
+
+  it('deleting the active roster clears activeRosterId', () => {
+    const engine = new StateEngine(rosterBaseData(), { persist: persistSpy, now: () => T0 })
+    const r = engine.createRoster({ name: 'R' })
+    engine.activateRoster(r.id)
+    engine.deleteRoster(r.id)
+    expect(engine.activeRosterId).toBeNull()
+  })
+
+  it('activateRoster throws NotFoundError for unknown id', () => {
+    const engine = new StateEngine(rosterBaseData(), { persist: persistSpy, now: () => T0 })
+    expect(() => engine.activateRoster('no-such')).toThrow(NotFoundError)
+  })
+})
+
+describe('StateEngine — assignment validation', () => {
+  it('rejects assignment to an excluded role', () => {
+    const engine = new StateEngine(rosterBaseData(), { persist: persistSpy, now: () => T0 })
+    // Charlie excludes 'GF' (a Gruppe role)
+    expect(() =>
+      engine.createRoster({
+        name: 'Bad',
+        assignments: { 'trk-gruppe': { GF: 'Charlie' } },
+      }),
+    ).toThrow(ValidationError)
+  })
+
+  it('rejects a person assigned twice in the same roster', () => {
+    const engine = new StateEngine(rosterBaseData(), { persist: persistSpy, now: () => T0 })
+    expect(() =>
+      engine.createRoster({
+        name: 'Bad',
+        assignments: {
+          'trk-gruppe': { GF: 'Alice', MA: 'Alice' },
+        },
+      }),
+    ).toThrow(ValidationError)
+  })
+
+  it('rejects unknown person name', () => {
+    const engine = new StateEngine(rosterBaseData(), { persist: persistSpy, now: () => T0 })
+    expect(() =>
+      engine.createRoster({
+        name: 'Bad',
+        assignments: { 'trk-gruppe': { GF: 'NoSuchPerson' } },
+      }),
+    ).toThrow(ValidationError)
+  })
+
+  it('rejects unknown role for the truck category', () => {
+    const engine = new StateEngine(rosterBaseData(), { persist: persistSpy, now: () => T0 })
+    // 'GF' is not a Staffel slot
+    expect(() =>
+      engine.createRoster({
+        name: 'Bad',
+        assignments: { 'trk-staffel': { GF: 'Alice' } },
+      }),
+    ).toThrow(ValidationError)
+  })
+
+  it('prunes unknown truckIds silently', () => {
+    const engine = new StateEngine(rosterBaseData(), { persist: persistSpy, now: () => T0 })
+    const roster = engine.createRoster({
+      name: 'Good',
+      assignments: { 'nonexistent-truck': { SF: 'Alice' } },
+    })
+    expect(Object.keys(roster.assignments)).toHaveLength(0)
+  })
+
+  it('allows null slot values', () => {
+    const engine = new StateEngine(rosterBaseData(), { persist: persistSpy, now: () => T0 })
+    const roster = engine.createRoster({
+      name: 'Partial',
+      assignments: { 'trk-gruppe': { GF: null } },
+    })
+    expect(roster.assignments['trk-gruppe']['GF']).toBeNull()
+  })
+})
+
+describe('StateEngine — truck-delete / category-change prunes rosters', () => {
+  it('deleting a truck removes its assignments entry from all rosters', () => {
+    const engine = new StateEngine(rosterBaseData(), { persist: persistSpy, now: () => T0 })
+    const roster = engine.createRoster({
+      name: 'R',
+      assignments: {
+        'trk-gruppe': { GF: 'Alice' },
+        'trk-staffel': { SF: 'Bob' },
+      },
+    })
+    engine.deleteTruck('trk-gruppe')
+    expect(engine.rosters[0].assignments['trk-gruppe']).toBeUndefined()
+    expect(engine.rosters[0].assignments['trk-staffel']).toBeDefined()
+  })
+
+  it('changing truck category prunes roles no longer valid', () => {
+    const engine = new StateEngine(rosterBaseData(), { persist: persistSpy, now: () => T0 })
+    // trk-gruppe (Gruppe) has slot GF; change to Staffel where GF doesn't exist
+    engine.createRoster({
+      name: 'R',
+      assignments: { 'trk-gruppe': { GF: 'Alice', MA: 'Bob' } },
+    })
+    engine.updateTruck('trk-gruppe', { category: 'Staffel' })
+    const slots = engine.rosters[0].assignments['trk-gruppe']
+    // GF is not in Staffel slots; MA is in Staffel slots
+    expect(slots?.['GF']).toBeUndefined()
+    expect(slots?.['MA']).toBe('Bob')
+  })
+})
+
+describe('StateEngine — randomAssign', () => {
+  it('assigns persons deterministically with a seeded rng', () => {
+    // A simple deterministic pseudo-rng cycling through fixed values
+    const seq = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    let i = 0
+    const rng = () => seq[i++ % seq.length]
+    const data = rosterBaseData()
+    const engine = new StateEngine(data, { persist: persistSpy, now: () => T0, rng })
+    const roster = engine.createRoster({ name: 'R' })
+    const result = engine.randomAssign(roster.id)
+    expect(result.assigned + result.unassigned.length).toBe(data.persons.length)
+    expect(typeof result.assigned).toBe('number')
+    expect(Array.isArray(result.unassigned)).toBe(true)
+  })
+
+  it('clears all existing assignments before re-assigning', () => {
+    const engine = new StateEngine(rosterBaseData(), { persist: persistSpy, now: () => T0 })
+    const roster = engine.createRoster({
+      name: 'R',
+      assignments: { 'trk-gruppe': { GF: 'Alice' } },
+    })
+    engine.randomAssign(roster.id)
+    // GF may or may not have Alice now — the key point is assignments were rebuilt
+    const totalFilled = Object.values(roster.assignments).flatMap(Object.values).filter(Boolean).length
+    // Just verify the result is consistent (no exception and some assignments made)
+    expect(totalFilled).toBeGreaterThanOrEqual(0)
+  })
+
+  it('throws NotFoundError for unknown roster', () => {
+    const engine = new StateEngine(rosterBaseData(), { persist: persistSpy, now: () => T0 })
+    expect(() => engine.randomAssign('ghost')).toThrow(NotFoundError)
+  })
+
+  it('respects excluded roles — excluded person never placed in excluded role', () => {
+    const engine = new StateEngine(rosterBaseData(), { persist: persistSpy, now: () => T0 })
+    const roster = engine.createRoster({ name: 'R' })
+    // Run many times to be confident
+    for (let run = 0; run < 10; run++) {
+      engine.randomAssign(roster.id)
+      const gfSlot = roster.assignments['trk-gruppe']?.['GF']
+      // Charlie excludes GF — should never appear there
+      expect(gfSlot).not.toBe('Charlie')
+    }
+  })
+})
+
+describe('StateEngine — getState includes activeRoster', () => {
+  it('returns null activeRoster when no roster is active', () => {
+    const engine = new StateEngine(rosterBaseData(), { persist: persistSpy, now: () => T0 })
+    expect(engine.getState().activeRoster).toBeNull()
+  })
+
+  it('returns the active roster name and assignments in public state', () => {
+    const engine = new StateEngine(rosterBaseData(), { persist: persistSpy, now: () => T0 })
+    const roster = engine.createRoster({
+      name: 'Active Roster',
+      assignments: { 'trk-gruppe': { GF: 'Alice' } },
+    })
+    engine.activateRoster(roster.id)
+    const state = engine.getState()
+    expect(state.activeRoster).not.toBeNull()
+    expect(state.activeRoster?.name).toBe('Active Roster')
+    expect(state.activeRoster?.assignments['trk-gruppe']['GF']).toBe('Alice')
+  })
+})

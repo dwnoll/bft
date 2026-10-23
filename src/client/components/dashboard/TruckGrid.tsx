@@ -1,13 +1,14 @@
 import Grid from '@mui/material/Grid'
-import type { Truck } from '../../../shared/types'
+import type { ActiveRosterSummary, Truck } from '../../../shared/types'
 import { TruckCard } from './TruckCard'
 
 interface TruckGridProps {
   trucks: Truck[]
   highlightedIds: ReadonlySet<string>
+  activeRoster?: ActiveRosterSummary | null
 }
 
-export function TruckGrid({ trucks, highlightedIds }: TruckGridProps) {
+export function TruckGrid({ trucks, highlightedIds, activeRoster }: TruckGridProps) {
   return (
     <Grid
       container
@@ -18,7 +19,11 @@ export function TruckGrid({ trucks, highlightedIds }: TruckGridProps) {
     >
       {trucks.map((truck) => (
         <Grid item xs={12} sm={6} md={4} key={truck.id} component="li" sx={{ display: 'flex' }}>
-          <TruckCard truck={truck} highlighted={highlightedIds.has(truck.id)} />
+          <TruckCard
+            truck={truck}
+            highlighted={highlightedIds.has(truck.id)}
+            activeRoster={activeRoster}
+          />
         </Grid>
       ))}
     </Grid>

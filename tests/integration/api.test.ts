@@ -481,3 +481,255 @@ describe('Express REST API & Authentication Integration Tests (Unit 3)', () => {
     })
   })
 })
+
+// ============================================================
+// Roster & Persons API Tests (crew_roster PRD §11)
+// ============================================================
+
+describe('Crew Roster API', () => {
+  let server: http.Server
+  let baseUrl: string
+  let engine: StateEngine
+  const authHeader = `Basic ${Buffer.from(`${DEFAULT_ADMIN_USER}:${DEFAULT_ADMIN_PASS}`).toString('base64')}`
+
+  async function api(path: string, init?: RequestInit) {
+    const res = await fetch(`${baseUrl}${path}`, init)
+    let body: unknown = null
+    const ct = res.headers.get('content-type')
+    if (ct?.includes('application/json')) body = await res.json()
+    else body = await res.text()
+    return { res, status: res.status, body }
+  }
+
+  beforeEach(async () => {
+    const data: DataFile = {
+      trucks: [
+        { id: 'trk-gruppe', name: 'HLF 20', category: 'Gruppe' },
+        { id: 'trk-staffel', name: 'ELF 1', category: 'Staffel' },
+      ],
+      alerts: [],
+      settings: { soundDurationSec: 60 },
+      persons: [
+        { name: 'Alice', excludedRoles: [] },
+        { name: 'Bob', excludedRoles: [] },
+      ],
+      rosters: [],
+      activeRosterId: null,
+    }
+    engine = new StateEngine(data, { persist: async () => {}, now: () => Date.now() })
+    const app = createApp(engine)
+    server = http.createServer(app)
+    await new Promise<void>((resolve) => server.listen(0, resolve))
+    const port = (server.address() as AddressInfo).port
+    baseUrl = `http://127.0.0.1:${port}`
+  })
+
+  afterEach(async () => {
+    await new Promise<void>((resolve, reject) => {
+      server.close((err) => (err ? reject(err) : resolve()))
+    })
+  })
+
+  describe('GET /api/persons', () => {
+    it('returns persons list when authenticated', async () => {
+      const { status, body } = await api('/api/persons', { headers: { Authorization: authHeader } })
+      expect(status).toBe(200)
+      expect(Array.isArray(body)).toBe(true)
+      expect((body as unknown[]).length).toBe(2)
+    })
+
+    it('rejects unauthenticated requests', async () => {
+      const { status } = await api('/api/persons')
+      expect(status).toBe(401)
+    })
+  })
+
+  describe('POST /api/rosters', () => {
+    it('creates a roster and returns 201', async () => {
+      const { status, body } = await api('/api/rosters', {
+        method: 'POST',
+        headers: { Authorization: authHeader, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Schicht A' }),
+      })
+      expect(status).toBe(201)
+      const roster = body as { id: string; name: string }
+      expect(roster.id).toBeDefined()
+      expect(roster.name).toBe('Schicht A')
+    })
+
+    it('returns 400 when name is missing', async () => {
+      const { status } = await api('/api/rosters', {
+        method: 'POST',
+        headers: { Authorization: authHeader, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: '' }),
+      })
+      expect(status).toBe(400)
+    })
+
+    it('returns 400 for excluded role assignment', async () => {
+      // Alice excludes GF — but Alice has no exclusions here; use Bob with excluded role
+      const dataWithExclusion: DataFile = {
+        trucks: [{ id: 'trk-gruppe', name: 'HLF 20', category: 'Gruppe' }],
+        alerts: [],
+        settings: { soundDurationSec: 60 },
+        persons: [{ name: 'Charlie', excludedRoles: ['GF'] }],
+        rosters: [],
+        activeRosterId: null,
+      }
+      const eng = new StateEngine(dataWithExclusion, { persist: async () => {}, now: () => Date.now() })
+      const app2 = createApp(eng)
+      const srv2 = http.createServer(app2)
+      await new Promise<void>((resolve) => srv2.listen(0, resolve))
+      const port2 = (srv2.address() as AddressInfo).port
+      const base2 = `http://127.0.0.1:${port2}`
+      const { status } = await fetch(`${base2}/api/rosters`, {
+        method: 'POST',
+        headers: { Authorization: authHeader, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Bad', assignments: { 'trk-gruppe': { GF: 'Charlie' } } }),
+      })
+      await new Promise<void>((resolve, reject) => srv2.close((e) => (e ? reject(e) : resolve())))
+      expect(status).toBe(400)
+    })
+  })
+
+  describe('GET /api/rosters', () => {
+    it('returns empty roster list and null activeRosterId initially', async () => {
+      const { status, body } = await api('/api/rosters', { headers: { Authorization: authHeader } })
+      expect(status).toBe(200)
+      const b = body as { rosters: unknown[]; activeRosterId: string | null }
+      expect(b.rosters).toHaveLength(0)
+      expect(b.activeRosterId).toBeNull()
+    })
+  })
+
+  describe('PATCH /api/rosters/:id', () => {
+    it('updates roster name', async () => {
+      const create = await api('/api/rosters', {
+        method: 'POST',
+        headers: { Authorization: authHeader, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Old' }),
+      })
+      const roster = create.body as { id: string }
+      const { status, body } = await api(`/api/rosters/${roster.id}`, {
+        method: 'PATCH',
+        headers: { Authorization: authHeader, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'New' }),
+      })
+      expect(status).toBe(200)
+      expect((body as { name: string }).name).toBe('New')
+    })
+
+    it('returns 404 for unknown id', async () => {
+      const { status } = await api('/api/rosters/no-such-id', {
+        method: 'PATCH',
+        headers: { Authorization: authHeader, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'X' }),
+      })
+      expect(status).toBe(404)
+    })
+  })
+
+  describe('DELETE /api/rosters/:id', () => {
+    it('deletes a roster and returns 204', async () => {
+      const create = await api('/api/rosters', {
+        method: 'POST',
+        headers: { Authorization: authHeader, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'ToDelete' }),
+      })
+      const roster = create.body as { id: string }
+      const { status } = await api(`/api/rosters/${roster.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: authHeader },
+      })
+      expect(status).toBe(204)
+    })
+
+    it('returns 404 for unknown id', async () => {
+      const { status } = await api('/api/rosters/ghost', {
+        method: 'DELETE',
+        headers: { Authorization: authHeader },
+      })
+      expect(status).toBe(404)
+    })
+  })
+
+  describe('POST /api/rosters/:id/activate and /deactivate', () => {
+    it('activates a roster', async () => {
+      const create = await api('/api/rosters', {
+        method: 'POST',
+        headers: { Authorization: authHeader, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'R' }),
+      })
+      const roster = create.body as { id: string }
+      const { status, body } = await api(`/api/rosters/${roster.id}/activate`, {
+        method: 'POST',
+        headers: { Authorization: authHeader },
+      })
+      expect(status).toBe(200)
+      expect((body as { activeRosterId: string }).activeRosterId).toBe(roster.id)
+    })
+
+    it('deactivates the active roster', async () => {
+      const create = await api('/api/rosters', {
+        method: 'POST',
+        headers: { Authorization: authHeader, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'R' }),
+      })
+      const roster = create.body as { id: string }
+      await api(`/api/rosters/${roster.id}/activate`, {
+        method: 'POST',
+        headers: { Authorization: authHeader },
+      })
+      const { status, body } = await api('/api/rosters/deactivate', {
+        method: 'POST',
+        headers: { Authorization: authHeader },
+      })
+      expect(status).toBe(200)
+      expect((body as { activeRosterId: null }).activeRosterId).toBeNull()
+    })
+  })
+
+  describe('POST /api/rosters/:id/random-assign', () => {
+    it('returns assigned/unassigned counts', async () => {
+      const create = await api('/api/rosters', {
+        method: 'POST',
+        headers: { Authorization: authHeader, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'R' }),
+      })
+      const roster = create.body as { id: string }
+      const { status, body } = await api(`/api/rosters/${roster.id}/random-assign`, {
+        method: 'POST',
+        headers: { Authorization: authHeader },
+      })
+      expect(status).toBe(200)
+      const result = body as { assigned: number; unassigned: string[] }
+      expect(typeof result.assigned).toBe('number')
+      expect(Array.isArray(result.unassigned)).toBe(true)
+    })
+  })
+
+  describe('GET /api/state — activeRoster in public state', () => {
+    it('includes null activeRoster when none is active', async () => {
+      const { status, body } = await api('/api/state')
+      expect(status).toBe(200)
+      expect((body as { activeRoster: null }).activeRoster).toBeNull()
+    })
+
+    it('includes active roster name and assignments', async () => {
+      const create = await api('/api/rosters', {
+        method: 'POST',
+        headers: { Authorization: authHeader, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Sichtbar', assignments: { 'trk-gruppe': { GF: 'Alice' } } }),
+      })
+      const roster = create.body as { id: string }
+      await api(`/api/rosters/${roster.id}/activate`, {
+        method: 'POST',
+        headers: { Authorization: authHeader },
+      })
+      const { body } = await api('/api/state')
+      const state = body as { activeRoster: { name: string; assignments: Record<string, Record<string, string | null>> } }
+      expect(state.activeRoster?.name).toBe('Sichtbar')
+      expect(state.activeRoster?.assignments['trk-gruppe']['GF']).toBe('Alice')
+    })
+  })
+})

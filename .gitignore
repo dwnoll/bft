@@ -4,3 +4,5 @@ data.json
 data.json.tmp.*
 *.log
 coverage/
+
+.DS_Store

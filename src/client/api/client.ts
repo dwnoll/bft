@@ -1,4 +1,4 @@
-import type { Alert, Settings, Truck, TruckCategory } from '../../shared/types'
+import type { Alert, Person, Roster, Settings, Truck, TruckCategory } from '../../shared/types'
 
 export interface CreateTruckInput {
   name: string
@@ -36,6 +36,16 @@ export interface UpdateAlertInput {
 
 export interface UpdateSettingsInput {
   soundDurationSec?: number
+}
+
+export interface CreateRosterInput {
+  name: string
+  assignments?: Roster['assignments']
+}
+
+export interface UpdateRosterInput {
+  name?: string
+  assignments?: Roster['assignments']
 }
 
 export class ApiError extends Error {
@@ -209,6 +219,57 @@ class ApiClient {
       method: 'PATCH',
       body: JSON.stringify(input),
     })
+  }
+
+  // --- Persons ---
+  public async getPersons(): Promise<Person[]> {
+    return this.request<Person[]>('/api/persons')
+  }
+
+  // --- Rosters ---
+  public async getRosters(): Promise<{ rosters: Roster[]; activeRosterId: string | null }> {
+    return this.request<{ rosters: Roster[]; activeRosterId: string | null }>('/api/rosters')
+  }
+
+  public async createRoster(input: CreateRosterInput): Promise<Roster> {
+    return this.request<Roster>('/api/rosters', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    })
+  }
+
+  public async updateRoster(id: string, input: UpdateRosterInput): Promise<Roster> {
+    return this.request<Roster>(`/api/rosters/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(input),
+    })
+  }
+
+  public async deleteRoster(id: string): Promise<void> {
+    return this.request<void>(`/api/rosters/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    })
+  }
+
+  public async activateRoster(id: string): Promise<{ rosters: Roster[]; activeRosterId: string | null }> {
+    return this.request<{ rosters: Roster[]; activeRosterId: string | null }>(
+      `/api/rosters/${encodeURIComponent(id)}/activate`,
+      { method: 'POST' },
+    )
+  }
+
+  public async deactivateRoster(): Promise<{ rosters: Roster[]; activeRosterId: string | null }> {
+    return this.request<{ rosters: Roster[]; activeRosterId: string | null }>(
+      '/api/rosters/deactivate',
+      { method: 'POST' },
+    )
+  }
+
+  public async randomAssignRoster(id: string): Promise<{ roster: Roster; assigned: number; unassigned: string[] }> {
+    return this.request<{ roster: Roster; assigned: number; unassigned: string[] }>(
+      `/api/rosters/${encodeURIComponent(id)}/random-assign`,
+      { method: 'POST' },
+    )
   }
 }
 

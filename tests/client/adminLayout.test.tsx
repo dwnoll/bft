@@ -53,6 +53,8 @@ describe('AdminLayout', () => {
     vi.spyOn(apiClient, 'getTrucks').mockResolvedValue(trucks)
     vi.spyOn(apiClient, 'getAlerts').mockResolvedValue([])
     vi.spyOn(apiClient, 'getSettings').mockResolvedValue({ soundDurationSec: 60 })
+    vi.spyOn(apiClient, 'getPersons').mockResolvedValue([])
+    vi.spyOn(apiClient, 'getRosters').mockResolvedValue({ rosters: [], activeRosterId: null })
 
     render(
       <ToastProvider>
@@ -82,6 +84,8 @@ describe('AdminLayout', () => {
     vi.spyOn(apiClient, 'getTrucks').mockResolvedValue(trucks)
     vi.spyOn(apiClient, 'getAlerts').mockResolvedValue([])
     vi.spyOn(apiClient, 'getSettings').mockResolvedValue({ soundDurationSec: 60 })
+    vi.spyOn(apiClient, 'getPersons').mockResolvedValue([])
+    vi.spyOn(apiClient, 'getRosters').mockResolvedValue({ rosters: [], activeRosterId: null })
     const falseAlertSpy = vi.spyOn(apiClient, 'triggerFalseAlert').mockResolvedValue({
       success: true,
       activeSince: Date.now(),
@@ -115,6 +119,8 @@ describe('AdminLayout', () => {
     vi.spyOn(apiClient, 'getTrucks').mockResolvedValue(trucks)
     vi.spyOn(apiClient, 'getAlerts').mockResolvedValue([])
     vi.spyOn(apiClient, 'getSettings').mockResolvedValue({ soundDurationSec: 60 })
+    vi.spyOn(apiClient, 'getPersons').mockResolvedValue([])
+    vi.spyOn(apiClient, 'getRosters').mockResolvedValue({ rosters: [], activeRosterId: null })
     vi.spyOn(apiClient, 'triggerFalseAlert').mockRejectedValue(
       new Error('Alarm aktiv oder ausstehend'),
     )
@@ -143,6 +149,8 @@ describe('AdminLayout', () => {
     vi.spyOn(apiClient, 'getTrucks').mockResolvedValue(trucks)
     vi.spyOn(apiClient, 'getAlerts').mockResolvedValue([])
     vi.spyOn(apiClient, 'getSettings').mockResolvedValue({ soundDurationSec: 60 })
+    vi.spyOn(apiClient, 'getPersons').mockResolvedValue([])
+    vi.spyOn(apiClient, 'getRosters').mockResolvedValue({ rosters: [], activeRosterId: null })
 
     render(
       <ToastProvider>

@@ -21,3 +21,36 @@ if (typeof window !== 'undefined' && typeof globalThis.localStorage?.clear !== '
     writable: true,
   })
 }
+
+// jsdom does not implement PointerEvent. dnd-kit (and pointer-drag tests)
+// rely on events exposing clientX/clientY, which the plain `Event` constructor
+// drops. Provide a minimal PointerEvent backed by MouseEvent when missing so
+// `fireEvent.pointerDown/Move/Up` produce events dnd-kit can read coordinates
+// from.
+if (typeof window !== 'undefined' && typeof window.PointerEvent !== 'function') {
+  const PointerEventPolyfill = class PointerEvent extends (window.MouseEvent as typeof MouseEvent) {
+    pointerId: number
+    pointerType: string
+    pressure: number
+    width: number
+    height: number
+    tiltX: number
+    tiltY: number
+    twist: number
+    isPrimary: boolean
+    constructor(type: string, init: PointerEventInit = {}) {
+      super(type, init)
+      this.pointerId = init.pointerId ?? 0
+      this.pointerType = init.pointerType ?? 'mouse'
+      this.pressure = init.pressure ?? 0
+      this.width = init.width ?? 0
+      this.height = init.height ?? 0
+      this.tiltX = init.tiltX ?? 0
+      this.tiltY = init.tiltY ?? 0
+      this.twist = init.twist ?? 0
+      // dnd-kit's PointerSensor activation handler requires isPrimary === true
+      this.isPrimary = init.isPrimary ?? true
+    }
+  }
+  ;(window as unknown as Record<string, unknown>).PointerEvent = PointerEventPolyfill
+}
