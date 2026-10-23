@@ -49,10 +49,6 @@ export function Dashboard() {
 
   return (
     <Container maxWidth="xl" component="main" sx={{ py: { xs: 2, md: 4 } }}>
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
-        <SoundToggle enabled={enabled} onChange={setEnabled} />
-      </Box>
-
       {/* Always mounted so screen readers announce every change (R1a). */}
       <Box role="status" aria-live="polite" aria-atomic="true" sx={visuallyHidden}>
         {announcement}
@@ -128,6 +124,10 @@ export function Dashboard() {
           <TruckGrid trucks={state.trucks} highlightedIds={highlightedIds} activeRoster={state.activeRoster} />
         </>
       )}
+
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3 }}>
+        <SoundToggle enabled={enabled} onChange={setEnabled} />
+      </Box>
     </Container>
   )
 }

@@ -107,7 +107,7 @@ export function RosterManager({
   return (
     <Card variant="outlined">
       <CardHeader
-        title="Mannschaftsbesatzung"
+        title="Fahreug-Besatzungen"
         subheader="Besatzungen anlegen, zuweisen und aktivieren"
         action={
           <Button variant="contained" onClick={handleCreate} sx={{ fontWeight: 700 }}>

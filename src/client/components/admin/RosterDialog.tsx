@@ -348,8 +348,14 @@ export function RosterDialog({ open, roster, persons, trucks, onClose }: RosterD
     setSaving(true)
     try {
       if (isCreate) {
-        const created = await apiClient.createRoster({ name: name.trim(), assignments })
-        showSuccess(`Besatzung "${created.name}" angelegt`)
+        if (savedRosterIdRef.current) {
+          // Random-assign already created the roster — update it instead of creating a duplicate
+          const updated = await apiClient.updateRoster(savedRosterIdRef.current, { name: name.trim(), assignments })
+          showSuccess(`Besatzung "${updated.name}" angelegt`)
+        } else {
+          const created = await apiClient.createRoster({ name: name.trim(), assignments })
+          showSuccess(`Besatzung "${created.name}" angelegt`)
+        }
       } else {
         const updated = await apiClient.updateRoster(roster!.id, { name: name.trim(), assignments })
         showSuccess(`Besatzung "${updated.name}" aktualisiert`)
@@ -360,6 +366,22 @@ export function RosterDialog({ open, roster, persons, trucks, onClose }: RosterD
     } finally {
       setSaving(false)
     }
+  }
+
+  // Cancel: in create mode, random-assign may already have persisted a stub
+  // roster — delete it so no orphan roster remains
+  const handleCancel = async () => {
+    if (isCreate && savedRosterIdRef.current) {
+      try {
+        await apiClient.deleteRoster(savedRosterIdRef.current)
+        onClose(true)
+      } catch (err) {
+        showError(err instanceof Error ? err.message : 'Fehler beim Löschen')
+        onClose(false)
+      }
+      return
+    }
+    onClose(false)
   }
 
   const handleRandomClick = () => {
@@ -413,7 +435,7 @@ export function RosterDialog({ open, roster, persons, trucks, onClose }: RosterD
 
   return (
     <>
-      <Dialog open={open} onClose={() => onClose(false)} maxWidth="md" fullWidth>
+      <Dialog open={open} onClose={() => void handleCancel()} maxWidth="xl" fullWidth>
         <DialogTitle>
           {isCreate ? 'Neue Besatzung anlegen' : 'Besatzung bearbeiten'}
         </DialogTitle>
@@ -454,7 +476,7 @@ export function RosterDialog({ open, roster, persons, trucks, onClose }: RosterD
                       key={truck.id}
                       variant="outlined"
                       data-testid={`truck-slot-grid-${truck.id}`}
-                      sx={{ p: 1.5, minWidth: 180, flex: '1 1 180px' }}
+                      sx={{ p: 1.5, minWidth: 125, flex: '1 1 150qpx' }}
                     >
                       <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
                         {truck.name}
@@ -511,7 +533,7 @@ export function RosterDialog({ open, roster, persons, trucks, onClose }: RosterD
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => onClose(false)} disabled={saving || randomLoading}>
+          <Button onClick={() => void handleCancel()} disabled={saving || randomLoading}>
             Abbrechen
           </Button>
           <Button

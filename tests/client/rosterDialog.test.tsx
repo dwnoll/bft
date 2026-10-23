@@ -73,6 +73,118 @@ describe('RosterDialog — create mode', () => {
     })
   })
 
+  it('random-assign + save creates exactly one roster (stub is updated, not re-created)', async () => {
+    const createSpy = vi.spyOn(apiClient, 'createRoster').mockResolvedValue({
+      id: 'stub-r',
+      name: 'My Roster',
+      assignments: {},
+    })
+    const randomSpy = vi.spyOn(apiClient, 'randomAssignRoster').mockResolvedValue({
+      roster: { id: 'stub-r', name: 'My Roster', assignments: { 'trk-gruppe': { GF: 'Alice' } } },
+      assigned: 1,
+      unassigned: [],
+    })
+    const updateSpy = vi.spyOn(apiClient, 'updateRoster').mockResolvedValue({
+      id: 'stub-r',
+      name: 'My Roster',
+      assignments: { 'trk-gruppe': { GF: 'Alice' } },
+    })
+    const onClose = vi.fn()
+
+    render(
+      <ToastProvider>
+        <RosterDialog open roster={null} persons={persons} trucks={trucks} onClose={onClose} />
+      </ToastProvider>,
+    )
+
+    fireEvent.change(screen.getByTestId('roster-name-input'), {
+      target: { value: 'My Roster' },
+    })
+    fireEvent.click(screen.getByTestId('random-assign-button'))
+
+    await waitFor(() => {
+      expect(randomSpy).toHaveBeenCalledWith('stub-r')
+    })
+    fireEvent.click(screen.getByTestId('save-roster-button'))
+
+    await waitFor(() => {
+      expect(onClose).toHaveBeenCalledWith(true)
+    })
+    expect(createSpy).toHaveBeenCalledTimes(1)
+    expect(updateSpy).toHaveBeenCalledWith(
+      'stub-r',
+      expect.objectContaining({ name: 'My Roster' }),
+    )
+  })
+
+  it('random-assign twice creates only one stub roster', async () => {
+    const createSpy = vi.spyOn(apiClient, 'createRoster').mockResolvedValue({
+      id: 'stub-r',
+      name: 'My Roster',
+      assignments: {},
+    })
+    vi.spyOn(apiClient, 'randomAssignRoster').mockResolvedValue({
+      roster: { id: 'stub-r', name: 'My Roster', assignments: {} },
+      assigned: 0,
+      unassigned: [],
+    })
+
+    render(
+      <ToastProvider>
+        <RosterDialog open roster={null} persons={persons} trucks={trucks} onClose={vi.fn()} />
+      </ToastProvider>,
+    )
+
+    fireEvent.change(screen.getByTestId('roster-name-input'), {
+      target: { value: 'My Roster' },
+    })
+    fireEvent.click(screen.getByTestId('random-assign-button'))
+    await waitFor(() => {
+      expect(createSpy).toHaveBeenCalledTimes(1)
+    })
+    fireEvent.click(screen.getByTestId('random-assign-button'))
+    await waitFor(() => {
+      expect(apiClient.randomAssignRoster).toHaveBeenCalledTimes(2)
+    })
+    expect(createSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('cancel after random-assign deletes the created stub roster', async () => {
+    const createSpy = vi.spyOn(apiClient, 'createRoster').mockResolvedValue({
+      id: 'stub-r',
+      name: 'My Roster',
+      assignments: {},
+    })
+    vi.spyOn(apiClient, 'randomAssignRoster').mockResolvedValue({
+      roster: { id: 'stub-r', name: 'My Roster', assignments: {} },
+      assigned: 0,
+      unassigned: [],
+    })
+    const deleteSpy = vi.spyOn(apiClient, 'deleteRoster').mockResolvedValue(undefined)
+    const onClose = vi.fn()
+
+    render(
+      <ToastProvider>
+        <RosterDialog open roster={null} persons={persons} trucks={trucks} onClose={onClose} />
+      </ToastProvider>,
+    )
+
+    fireEvent.change(screen.getByTestId('roster-name-input'), {
+      target: { value: 'My Roster' },
+    })
+    fireEvent.click(screen.getByTestId('random-assign-button'))
+    await waitFor(() => {
+      expect(createSpy).toHaveBeenCalledTimes(1)
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Abbrechen' }))
+
+    await waitFor(() => {
+      expect(deleteSpy).toHaveBeenCalledWith('stub-r')
+      expect(onClose).toHaveBeenCalledWith(true)
+    })
+  })
+
   it('save button is disabled when name is empty', () => {
     render(
       <ToastProvider>
