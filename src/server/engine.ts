@@ -334,6 +334,16 @@ export class StateEngine {
     return { activeSince: n }
   }
 
+  /** Cancel an active false alarm, freeing the one-alarm slot. Rejects if none is active. */
+  cancelFalseAlert(): { success: boolean } {
+    if (this.falseAlarmActiveSince === null) {
+      throw new InvariantError('FALSE_ALARM_NOT_ACTIVE', 'Fehlalarm ist nicht aktiv')
+    }
+    this.falseAlarmActiveSince = null
+    this.schedulePersist()
+    return { success: true }
+  }
+
   // --- management ------------------------------------------------------------
 
   private validateCategory(value: unknown): TruckCategory {

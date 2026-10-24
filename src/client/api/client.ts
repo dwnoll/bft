@@ -209,6 +209,10 @@ class ApiClient {
     })
   }
 
+  public async cancelFalseAlert(): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>('/api/false-alert', { method: 'DELETE' })
+  }
+
   // --- Settings ---
   public async getSettings(): Promise<Settings> {
     return this.request<Settings>('/api/settings')

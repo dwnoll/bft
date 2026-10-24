@@ -12,6 +12,7 @@ import Typography from '@mui/material/Typography'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Alert as AlertType, Person, Roster, Settings, Truck } from '../../../shared/types'
 import { apiClient } from '../../api/client'
+import { useAppState } from '../../hooks/useAppState'
 import { COLOR_EMERGENCY } from '../../theme'
 import { ConfirmDialog } from '../common/ConfirmDialog'
 import { useToast } from '../common/ToastContainer'
@@ -30,6 +31,10 @@ export function AdminLayout({
   onAuthenticatedChange,
 }: AdminLayoutProps) {
   const { showSuccess, showError } = useToast()
+
+  // Public dashboard state — drives the toggleable false-alarm button (R15).
+  const { state: publicState } = useAppState()
+  const falseAlarmActive = publicState?.falseAlarmActive === true
 
   // Authentication State
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(
@@ -61,6 +66,7 @@ export function AdminLayout({
   // False Alarm Trigger State
   const [falseAlarmDialogOpen, setFalseAlarmDialogOpen] = useState(false)
   const [triggeringFalseAlarm, setTriggeringFalseAlarm] = useState(false)
+  const [cancelingFalseAlarm, setCancelingFalseAlarm] = useState(false)
 
   // Settings save state
   const [savingSettings, setSavingSettings] = useState(false)
@@ -161,6 +167,19 @@ export function AdminLayout({
     }
   }
 
+  const handleCancelFalseAlarmConfirm = async () => {
+    setCancelingFalseAlarm(true)
+    try {
+      await apiClient.cancelFalseAlert()
+      showSuccess('Fehlalarm abgebrochen')
+      setFalseAlarmDialogOpen(false)
+    } catch (err) {
+      showError(err instanceof Error ? err.message : 'Fehler beim Abbrechen des Fehlalarms')
+    } finally {
+      setCancelingFalseAlarm(false)
+    }
+  }
+
   const handleSaveSettings = async (soundDurationSec: number) => {
     setSavingSettings(true)
     try {
@@ -251,18 +270,29 @@ export function AdminLayout({
         </Box>
 
         <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-          <Button
-            variant="contained"
-            color="error"
-            onClick={() => setFalseAlarmDialogOpen(true)}
-            sx={{
-              fontWeight: 700,
-              bgcolor: COLOR_EMERGENCY,
-              '&:hover': { bgcolor: '#b71c1c' },
-            }}
-          >
-            Fehlalarm auslösen
-          </Button>
+          {falseAlarmActive ? (
+            <Button
+              variant="outlined"
+              color="warning"
+              onClick={() => setFalseAlarmDialogOpen(true)}
+              sx={{ fontWeight: 700 }}
+            >
+              Fehlalarm abbrechen
+            </Button>
+          ) : (
+            <Button
+              variant="contained"
+              color="error"
+              onClick={() => setFalseAlarmDialogOpen(true)}
+              sx={{
+                fontWeight: 700,
+                bgcolor: COLOR_EMERGENCY,
+                '&:hover': { bgcolor: '#b71c1c' },
+              }}
+            >
+              Fehlalarm auslösen
+            </Button>
+          )}
         </Box>
       </Box>
 
@@ -312,17 +342,21 @@ export function AdminLayout({
         />
       )}
 
-      {/* False Alarm Confirmation Dialog */}
+      {/* False Alarm Trigger / Cancel Dialog */}
       <ConfirmDialog
         open={falseAlarmDialogOpen}
-        title="Fehlalarm auslösen"
-        message="Möchten Sie sofort einen Fehlalarm auslösen? Dies aktiviert den Alarmton und schaltet den Einsatzmonitor für 10 Minuten auf Fehlalarm."
-        confirmText="Fehlalarm auslösen"
+        title={falseAlarmActive ? 'Fehlalarm abbrechen' : 'Fehlalarm auslösen'}
+        message={
+          falseAlarmActive
+            ? 'Möchten Sie den aktiven Fehlalarm abbrechen? Der Einsatzmonitor kehrt daraufhin in den Bereitschaftszustand zurück.'
+            : 'Möchten Sie sofort einen Fehlalarm auslösen? Dies aktiviert den Alarmton und schaltet den Einsatzmonitor für 10 Minuten auf Fehlalarm.'
+        }
+        confirmText={falseAlarmActive ? 'Fehlalarm abbrechen' : 'Fehlalarm auslösen'}
         cancelText="Abbrechen"
-        confirmColor="error"
-        onConfirm={handleFalseAlarmConfirm}
+        confirmColor={falseAlarmActive ? 'warning' : 'error'}
+        onConfirm={falseAlarmActive ? handleCancelFalseAlarmConfirm : handleFalseAlarmConfirm}
         onCancel={() => setFalseAlarmDialogOpen(false)}
-        loading={triggeringFalseAlarm}
+        loading={falseAlarmActive ? cancelingFalseAlarm : triggeringFalseAlarm}
       />
     </Container>
   )
