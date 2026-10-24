@@ -71,7 +71,7 @@ export function Dashboard() {
             <Paper
               component="section"
               aria-label="Aktiver Alarm"
-              sx={{ bgcolor: COLOR_EMERGENCY, color: '#ffffff', p: { xs: 2, md: 4 }, mb: 3 }}
+              sx={{ bgcolor: COLOR_EMERGENCY, color: '#ffffff', p: { xs: 1, md: 1.5 }, mb: 3 }}
             >
               <Box
                 sx={{
@@ -93,7 +93,6 @@ export function Dashboard() {
                 </Box>
                 <Box sx={{ display: 'flex', flex: { xs: 'none', md: 1 } }}>
                   <LocationPanel
-                    title="Einsatzort"
                     address={activeAlert.address}
                     lat={activeAlert.lat}
                     lng={activeAlert.lng}

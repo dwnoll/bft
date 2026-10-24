@@ -223,6 +223,24 @@ describe('StateEngine false alarm', () => {
       'ALARM_ACTIVE_OR_PENDING',
     )
   })
+
+  it('cancels an active false alarm and frees the slot (R15)', () => {
+    const engine = makeEngine()
+    engine.triggerFalseAlert(T0)
+
+    const result = engine.cancelFalseAlert()
+    expect(result.success).toBe(true)
+    expect(engine.getState(T0).falseAlarmActive).toBe(false)
+
+    // The freed slot accepts a real alert again.
+    expect(() => engine.armTrigger('al-1', 5, T0)).not.toThrow()
+  })
+
+  it('rejects cancelling a false alarm when none is active', () => {
+    const engine = makeEngine()
+
+    expectInvariantCode(() => engine.cancelFalseAlert(), 'FALSE_ALARM_NOT_ACTIVE')
+  })
 })
 
 describe('StateEngine single-active-alarm invariant (R10, R16)', () => {

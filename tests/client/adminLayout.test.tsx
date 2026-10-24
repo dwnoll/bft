@@ -1,14 +1,20 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError, apiClient } from '../../src/client/api/client'
 import { AdminLayout } from '../../src/client/components/admin/AdminLayout'
 import { ToastProvider } from '../../src/client/components/common/ToastContainer'
-import { trucks } from './fixtures'
+import { makeState, mockFetchState, trucks } from './fixtures'
 
 describe('AdminLayout', () => {
   beforeEach(() => {
     apiClient.clearCredentials()
     vi.restoreAllMocks()
+    // useAppState polls the public state endpoint; default to an idle state.
+    mockFetchState(() => makeState())
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
   })
 
   it('renders login screen when unauthenticated', () => {
@@ -111,6 +117,42 @@ describe('AdminLayout', () => {
     await waitFor(() => {
       expect(falseAlertSpy).toHaveBeenCalled()
       expect(screen.getByText('Fehlalarm ausgelöst')).toBeInTheDocument()
+    })
+  })
+
+  it('shows a cancel button and cancels an active false alarm (R15)', async () => {
+    apiClient.setCredentials('ffw_bft', 'bft_2026')
+    // A false alarm is currently active.
+    mockFetchState(() => makeState({ falseAlarmActive: true }))
+    vi.spyOn(apiClient, 'getTrucks').mockResolvedValue(trucks)
+    vi.spyOn(apiClient, 'getAlerts').mockResolvedValue([])
+    vi.spyOn(apiClient, 'getSettings').mockResolvedValue({ soundDurationSec: 60 })
+    vi.spyOn(apiClient, 'getPersons').mockResolvedValue([])
+    vi.spyOn(apiClient, 'getRosters').mockResolvedValue({ rosters: [], activeRosterId: null })
+    const cancelSpy = vi.spyOn(apiClient, 'cancelFalseAlert').mockResolvedValue({ success: true })
+
+    render(
+      <ToastProvider>
+        <AdminLayout />
+      </ToastProvider>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('Verwaltung')).toBeInTheDocument()
+    })
+
+    // While a false alarm is active, the button reads "Fehlalarm abbrechen".
+    await screen.findByRole('button', { name: 'Fehlalarm abbrechen' })
+    fireEvent.click(screen.getByRole('button', { name: 'Fehlalarm abbrechen' }))
+    expect(screen.getByText(/Möchten Sie den aktiven Fehlalarm abbrechen\?/)).toBeInTheDocument()
+
+    // Confirm the cancel dialog.
+    const confirmBtns = screen.getAllByRole('button', { name: 'Fehlalarm abbrechen' })
+    fireEvent.click(confirmBtns[confirmBtns.length - 1])
+
+    await waitFor(() => {
+      expect(cancelSpy).toHaveBeenCalled()
+      expect(screen.getByText('Fehlalarm abgebrochen')).toBeInTheDocument()
     })
   })
 

@@ -379,6 +379,32 @@ describe('Express REST API & Authentication Integration Tests (Unit 3)', () => {
       expect(status).toBe(409)
       expect(body.error).toBe('Alarm aktiv oder ausstehend')
     })
+
+    it('cancels an active false alarm with DELETE /api/false-alert (R15)', async () => {
+      await api('/api/false-alert', { method: 'POST', headers: { Authorization: authHeader } })
+      const activeState = await api('/api/state')
+      expect(activeState.body.falseAlarmActive).toBe(true)
+
+      const { status, body } = await api('/api/false-alert', {
+        method: 'DELETE',
+        headers: { Authorization: authHeader },
+      })
+      expect(status).toBe(200)
+      expect(body.success).toBe(true)
+
+      const stateRes = await api('/api/state')
+      expect(stateRes.body.falseAlarmActive).toBe(false)
+    })
+
+    it('rejects cancelling a false alarm when none is active with 409', async () => {
+      const { status, body } = await api('/api/false-alert', {
+        method: 'DELETE',
+        headers: { Authorization: authHeader },
+      })
+
+      expect(status).toBe(409)
+      expect(body.error).toBe('Fehlalarm ist nicht aktiv')
+    })
   })
 
   // --- Settings API (PRD §9, §10, R17) ---

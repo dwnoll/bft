@@ -1,6 +1,5 @@
 import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
-import { zoomLabel } from '../../../shared/constants'
 
 interface LocationPanelProps {
   /** Alert address. Empty (or whitespace-only) shows the "please enter" hint. */
@@ -10,8 +9,6 @@ interface LocationPanelProps {
   lng?: number | null
   /** Map zoom level (14-17). Falls back to 17 in the map URL when absent. */
   zoom?: number
-  /** Context label rendered above the panel (e.g. "Einsatzort"). */
-  title: string
   /** Fill the parent's height (parent must be a flex container). Off by default. */
   stretch?: boolean
   /** Vertically center the panel content (meant to be combined with `stretch`). Off by default. */
@@ -29,7 +26,7 @@ const MAP_AREA_HEIGHT = 320
  * When the address is empty, a hint prompts the user to enter an address
  * (and optionally coordinates).
  */
-export function LocationPanel({ address, lat, lng, zoom, title, stretch = false, centered = false }: LocationPanelProps) {
+export function LocationPanel({ address, lat, lng, zoom, stretch = false, centered = false }: LocationPanelProps) {
   const hasAddress = address.trim().length > 0
   const hasPosition = lat != null && lng != null
   const mapZoom = zoom ?? DEFAULT_MAP_ZOOM
@@ -43,12 +40,11 @@ export function LocationPanel({ address, lat, lng, zoom, title, stretch = false,
         borderColor: 'divider',
         borderRadius: 2,
         bgcolor: 'background.default',
-        p: 2.5,
+        p: 0.5,
         ...(stretch ? { display: 'flex', flexDirection: 'column', flex: 1 } : undefined),
         ...(centered ? { justifyContent: 'center' } : undefined),
       }}
     >
-      <Legend title={title} zoomText={zoom != null ? zoomLabel(zoom) : undefined} />
       {hasAddress ? (
         <Box sx={{ height: MAP_AREA_HEIGHT }}>
           <iframe
@@ -75,13 +71,5 @@ export function LocationPanel({ address, lat, lng, zoom, title, stretch = false,
         </Box>
       )}
     </Box>
-  )
-}
-
-function Legend({ title, zoomText }: { title: string; zoomText?: string }) {
-  return (
-    <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-      {title} {zoomText ? `(Zoom: ${zoomText})` : ''}
-    </Typography>
   )
 }

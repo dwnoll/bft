@@ -19,6 +19,10 @@ export function TruckCard({ truck, highlighted, activeRoster }: TruckCardProps) 
   const midCount = Math.ceil(slots.length / 2)
   const middleSlots = slots.slice(0, midCount)
   const rightSlots = slots.slice(midCount)
+  // const thirdCount = Math.ceil(slots.length / 3)
+  // const col2Slots = slots.slice(0, thirdCount)
+  // const col3Slots = slots.slice(thirdCount, thirdCount * 2)
+  // const col4Slots = slots.slice(thirdCount * 2)
 
   const renderSlots = (roles: string[]) =>
     roles.map((role) => {
@@ -26,7 +30,7 @@ export function TruckCard({ truck, highlighted, activeRoster }: TruckCardProps) 
       return (
         <Typography
           key={role}
-          variant="caption"
+          variant="overline"
           component="div"
           sx={{ opacity: 0.9, lineHeight: 1.8 }}
           data-testid={`crew-slot-${role}`}
@@ -80,10 +84,7 @@ export function TruckCard({ truck, highlighted, activeRoster }: TruckCardProps) 
           )}
         </Box>
 
-        {/* Middle column: first half of crew slots */}
         <Box>{renderSlots(middleSlots)}</Box>
-
-        {/* Right column: second half of crew slots */}
         <Box>{renderSlots(rightSlots)}</Box>
       </Box>
     </Paper>

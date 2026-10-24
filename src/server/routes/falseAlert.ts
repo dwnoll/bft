@@ -14,5 +14,15 @@ export function createFalseAlertRouter(engine: StateEngine): Router {
     }
   })
 
+  // DELETE /api/false-alert — Cancel an active false alarm (PRD §8, §10, R15)
+  router.delete('/false-alert', (_req, res, next) => {
+    try {
+      const result = engine.cancelFalseAlert()
+      res.json(result)
+    } catch (err) {
+      next(err)
+    }
+  })
+
   return router
 }
