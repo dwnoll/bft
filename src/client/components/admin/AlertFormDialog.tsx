@@ -347,7 +347,6 @@ export function AlertFormDialog({
 
             <Box sx={{ display: 'flex', flex: { xs: 'none', md: 1 } }}>
               <LocationPanel
-                title="Einsatzort"
                 address={preview.address}
                 lat={preview.lat}
                 lng={preview.lng}
