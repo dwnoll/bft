@@ -13,8 +13,10 @@ import TableHead from '@mui/material/TableHead'
 import TableRow from '@mui/material/TableRow'
 import Typography from '@mui/material/Typography'
 import { useState } from 'react'
+import { isArmed } from '../../../shared/constants'
 import type { Alert, Truck } from '../../../shared/types'
 import { apiClient, type CreateAlertInput } from '../../api/client'
+import { errorMessage } from '../../api/apiError'
 import { COLOR_EMERGENCY, COLOR_SUCCESS } from '../../theme'
 import { ConfirmDialog } from '../common/ConfirmDialog'
 import { useToast } from '../common/ToastContainer'
@@ -76,7 +78,7 @@ export function AlertManager({
       setFormOpen(false)
       await onRefresh()
     } catch (err) {
-      showError(err instanceof Error ? err.message : 'Fehler beim Speichern des Alarms')
+      showError(errorMessage(err, 'Fehler beim Speichern des Alarms'))
     } finally {
       setFormSubmitting(false)
     }
@@ -91,7 +93,7 @@ export function AlertManager({
       setDeleteTarget(null)
       await onRefresh()
     } catch (err) {
-      showError(err instanceof Error ? err.message : 'Fehler beim Löschen des Alarms')
+      showError(errorMessage(err, 'Fehler beim Löschen des Alarms'))
     } finally {
       setDeleting(false)
     }
@@ -106,7 +108,7 @@ export function AlertManager({
       setTriggerAlertTarget(null)
       await onRefresh()
     } catch (err) {
-      showError(err instanceof Error ? err.message : 'Fehler beim Auslösen des Alarms')
+      showError(errorMessage(err, 'Fehler beim Auslösen des Alarms'))
     } finally {
       setTriggerSubmitting(false)
     }
@@ -119,7 +121,7 @@ export function AlertManager({
       showSuccess('Trigger abgebrochen')
       await onRefresh()
     } catch (err) {
-      showError(err instanceof Error ? err.message : 'Fehler beim Abbrechen des Triggers')
+      showError(errorMessage(err, 'Fehler beim Abbrechen des Triggers'))
     } finally {
       setActionBusyId(null)
     }
@@ -132,7 +134,7 @@ export function AlertManager({
       showSuccess(`Alarm "${alert.name}" abgeschlossen`)
       await onRefresh()
     } catch (err) {
-      showError(err instanceof Error ? err.message : 'Fehler beim Abschließen des Alarms')
+      showError(errorMessage(err, 'Fehler beim Abschließen des Alarms'))
     } finally {
       setActionBusyId(null)
     }
@@ -148,9 +150,7 @@ export function AlertManager({
 
   const renderStatus = (alert: Alert) => {
     // Use server-authoritative status for action gating to avoid client clock skew.
-    const isArmed = alert.status === 'pending' && alert.triggerAt !== undefined
-
-    if (isArmed && alert.triggerAt) {
+    if (isArmed(alert) && alert.triggerAt) {
       return <CountdownBadge triggerAt={alert.triggerAt} onExpire={onRefresh} />
     }
 
@@ -230,9 +230,9 @@ export function AlertManager({
               </TableHead>
               <TableBody>
                 {(alerts || []).map((alert) => {
-                  // Server-authoritative: armed = pending status + triggerAt present.
-                  // Using Date.now() here could hide the "Abbrechen" button due to clock skew.
-                  const isArmed = alert.status === 'pending' && alert.triggerAt !== undefined
+                  // Server-authoritative (shared predicate): using Date.now() here could
+                  // hide the "Abbrechen" button due to clock skew.
+                  const armed = isArmed(alert)
                   const isBusy = actionBusyId === alert.id || loading
 
                   return (
@@ -252,7 +252,7 @@ export function AlertManager({
                       <TableCell align="right">
                         <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, flexWrap: 'wrap' }}>
                           {/* Armed trigger: Cancel button */}
-                          {isArmed ? (
+                          {armed ? (
                             <Button
                               size="small"
                               variant="contained"

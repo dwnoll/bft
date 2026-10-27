@@ -45,7 +45,7 @@ describe('RosterManager', () => {
         />
       </ToastProvider>,
     )
-    expect(screen.getByText('Mannschaftsbesatzung')).toBeInTheDocument()
+    expect(screen.getByText('Fahrzeug-Besatzungen')).toBeInTheDocument()
     expect(screen.getByText('Keine Besatzungen vorhanden.')).toBeInTheDocument()
   })
 

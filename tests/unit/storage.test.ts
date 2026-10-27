@@ -92,3 +92,74 @@ describe('storage save', () => {
     await expect(load(file)).rejects.toThrow(/Failed to parse data\.json/)
   })
 })
+
+describe('storage load() integrity sweep', () => {
+  function writeData(partial: Record<string, unknown>): void {
+    const base = {
+      trucks: [],
+      alerts: [],
+      settings: { soundDurationSec: 60 },
+    }
+    writeFileSync(file, JSON.stringify({ ...base, ...partial }))
+  }
+
+  it.each([
+    ['a JSON array', '[]'],
+    ['null', 'null'],
+    ['missing trucks', JSON.stringify({ alerts: [], settings: {} })],
+    ['missing alerts', JSON.stringify({ trucks: [], settings: {} })],
+    ['missing settings', JSON.stringify({ trucks: [], alerts: [] })],
+  ])('rejects invalid top-level structure: %s', async (_label, raw) => {
+    writeFileSync(file, raw)
+    await expect(load(file)).rejects.toThrow(/Invalid data\.json structure/)
+  })
+
+  it('rejects duplicate person names', async () => {
+    writeData({
+      persons: [
+        { name: 'Alice', excludedRoles: [] },
+        { name: 'Alice', excludedRoles: [] },
+      ],
+    })
+    await expect(load(file)).rejects.toThrow(/Duplicate person name/)
+  })
+
+  it('defaults missing persons/rosters/activeRosterId (pre-roster files)', async () => {
+    writeData({})
+    const data = await load(file)
+    expect(data.persons).toEqual([])
+    expect(data.rosters).toEqual([])
+    expect(data.activeRosterId).toBeNull()
+  })
+
+  it('clears orphaned triggerAt on non-pending alerts but keeps armed ones', async () => {
+    writeData({
+      alerts: [
+        pendingAlert({ id: 'armed', triggerAt: 123 }),
+        pendingAlert({ id: 'active', status: 'active', triggerAt: 456 }),
+        pendingAlert({ id: 'complete', status: 'complete', triggerAt: 789 }),
+      ],
+    })
+    const data = await load(file)
+    const byId = Object.fromEntries(data.alerts.map((a) => [a.id, a]))
+    expect(byId['armed'].triggerAt).toBe(123)
+    expect(byId['active'].triggerAt).toBeUndefined()
+    expect(byId['complete'].triggerAt).toBeUndefined()
+  })
+
+  it('does not apply business-rule roster pruning (handled by StateEngine)', async () => {
+    writeData({
+      trucks: [{ id: 't1', name: 'T', category: 'Gruppe' }],
+      persons: [{ name: 'Alice', excludedRoles: [] }],
+      rosters: [{ id: 'r1', name: 'R', assignments: { gone: { GF: 'Alice' }, t1: { GF: 'Ghost' } } }],
+    })
+    const data = await load(file)
+    expect(data.rosters[0].assignments['gone']).toBeDefined()
+    expect(data.rosters[0].assignments['t1']['GF']).toBe('Ghost')
+  })
+
+  it('throws (non-iterable alerts) on a non-array alerts value so startServer can recover', async () => {
+    writeData({ alerts: { not: 'an array' } })
+    await expect(load(file)).rejects.toThrow()
+  })
+})

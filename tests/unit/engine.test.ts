@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import {
   StateEngine,
   InvariantError,
@@ -9,7 +9,7 @@ import {
   type DataFile,
   type PersistFn,
 } from '../../src/server/engine'
-import { defaultDataFile } from '../../src/shared/constants'
+import { CREW_SLOTS, defaultDataFile } from '../../src/shared/constants'
 
 // --- deterministic time helpers ---------------------------------------------
 const T0 = 1_000_000
@@ -789,5 +789,246 @@ describe('StateEngine — getState includes activeRoster', () => {
     expect(state.activeRoster).not.toBeNull()
     expect(state.activeRoster?.name).toBe('Active Roster')
     expect(state.activeRoster?.assignments['trk-gruppe']['GF']).toBe('Alice')
+  })
+})
+
+describe('StateEngine — location validation (create/update alert)', () => {
+  const valid = {
+    name: 'A',
+    category: 'C',
+    address: 'Addr',
+    info: 'Info',
+  }
+
+  it.each([
+    ['lat below -90', { lat: -90.1, lng: 0 }],
+    ['lat above 90', { lat: 90.1, lng: 0 }],
+    ['lng below -180', { lat: 0, lng: -180.1 }],
+    ['lng above 180', { lat: 0, lng: 180.1 }],
+  ])('createAlert rejects %s', (_label, loc) => {
+    const engine = makeEngine()
+    expect(() => engine.createAlert({ ...valid, ...loc })).toThrow(ValidationError)
+  })
+
+  it.each([13, 18, 15.5, 'abc', NaN])('createAlert rejects zoom %s', (zoom) => {
+    const engine = makeEngine()
+    expect(() => engine.createAlert({ ...valid, zoom })).toThrow(ValidationError)
+  })
+
+  it.each([14, 17])('createAlert accepts boundary zoom %s', (zoom) => {
+    const engine = makeEngine()
+    expect(engine.createAlert({ ...valid, zoom }).zoom).toBe(zoom)
+  })
+
+  it('createAlert ignores non-finite or non-numeric coordinates (stores no position)', () => {
+    const engine = makeEngine()
+    expect(engine.createAlert({ ...valid, lat: NaN, lng: 1 })).toMatchObject({ lat: null, lng: null })
+    expect(engine.createAlert({ ...valid, lat: '52', lng: '13' })).toMatchObject({ lat: null, lng: null })
+  })
+
+  it('updateAlert rejects out-of-range values and leaves the alert unchanged', () => {
+    const engine = makeEngine()
+    const before = { ...engine.alerts[0] }
+    expect(() => engine.updateAlert('al-1', { lat: 91, lng: 0 })).toThrow(ValidationError)
+    expect(() => engine.updateAlert('al-1', { zoom: 13 })).toThrow(ValidationError)
+    expect(() => engine.updateAlert('al-1', { zoom: 18 })).toThrow(ValidationError)
+    expect(engine.alerts[0].lat).toBe(before.lat)
+    expect(engine.alerts[0].zoom).toBe(before.zoom)
+  })
+})
+
+describe('StateEngine — persistence failure handling', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.useRealTimers()
+  })
+
+  it('a rejecting persist does not throw from the mutation and records lastPersistFailure', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const err = Object.assign(new Error('denied'), { code: 'EACCES' })
+    const persist = vi.fn().mockRejectedValue(err)
+    const engine = new StateEngine(baseData(), { persist, now: () => T0 })
+
+    expect(() => engine.armTrigger('al-1', 5, T0)).not.toThrow()
+    await vi.waitFor(() => expect(engine.lastPersistFailure).toBe(err))
+    expect(persist).toHaveBeenCalledTimes(1) // EACCES is not retried
+  })
+
+  it('a synchronously throwing persist does not crash the mutation', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const persist = vi.fn(() => {
+      throw new Error('boom')
+    }) as unknown as PersistFn
+    const engine = new StateEngine(baseData(), { persist, now: () => T0 })
+
+    expect(() => engine.armTrigger('al-1', 5, T0)).not.toThrow()
+    expect(engine.lastPersistFailure).toBeInstanceOf(Error)
+  })
+
+  it('a throwing persist does not crash tick()', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const persist = vi.fn().mockRejectedValue(new Error('disk gone'))
+    const engine = new StateEngine(baseData(), { persist, now: () => T0 })
+    engine.armTrigger('al-1', 3, T0)
+
+    expect(() => engine.tick(T0 + 3 * 60_000)).not.toThrow()
+    expect(engine.alerts[0].status).toBe('active')
+    await vi.waitFor(() => expect(engine.lastPersistFailure).not.toBeNull())
+  })
+
+  it('retries transient errors (EAGAIN) and clears lastPersistFailure on success', async () => {
+    vi.useFakeTimers()
+    const transient = Object.assign(new Error('again'), { code: 'EAGAIN' })
+    const persist = vi
+      .fn()
+      .mockRejectedValueOnce(transient)
+      .mockRejectedValueOnce(transient)
+      .mockResolvedValue(undefined)
+    const engine = new StateEngine(baseData(), { persist, now: () => T0 })
+
+    engine.armTrigger('al-1', 5, T0)
+    await vi.advanceTimersByTimeAsync(1000)
+
+    expect(persist).toHaveBeenCalledTimes(3)
+    expect(engine.lastPersistFailure).toBeNull()
+  })
+
+  it('gives up after bounded retries on a persistent transient error', async () => {
+    vi.useFakeTimers()
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const transient = Object.assign(new Error('full'), { code: 'ENOSPC' })
+    const persist = vi.fn().mockRejectedValue(transient)
+    const engine = new StateEngine(baseData(), { persist, now: () => T0 })
+
+    engine.armTrigger('al-1', 5, T0)
+    await vi.advanceTimersByTimeAsync(5000)
+
+    expect(persist).toHaveBeenCalledTimes(4) // 1 + 3 retries
+    expect(engine.lastPersistFailure).toBe(transient)
+  })
+})
+
+describe('StateEngine — single-slot invariant under interleaving', () => {
+  it('only one of many rapid arm/false-alarm requests succeeds', async () => {
+    const data = baseData()
+    const engine = makeEngine(data)
+
+    const attempts: Array<() => unknown> = [
+      () => engine.armTrigger('al-1', 5, T0),
+      () => engine.armTrigger('al-2', 5, T0),
+      () => engine.triggerFalseAlert(T0),
+      () => engine.armTrigger('al-1', 4, T0),
+      () => engine.triggerFalseAlert(T0),
+    ]
+    const results = await Promise.allSettled(
+      attempts.map((fn) => Promise.resolve().then(fn)),
+    )
+
+    const fulfilled = results.filter((r) => r.status === 'fulfilled')
+    expect(fulfilled).toHaveLength(1)
+    for (const r of results) {
+      if (r.status === 'rejected') expect(r.reason).toBeInstanceOf(InvariantError)
+    }
+    const armed = engine.alerts.filter((a) => a.triggerAt !== undefined).length
+    const falseActive = engine.getState(T0).falseAlarmActive ? 1 : 0
+    expect(armed + falseActive).toBe(1)
+  })
+})
+
+describe('StateEngine — roster normalization on construction', () => {
+  it('prunes deleted trucks, invalid roles and orphaned persons from persisted rosters', () => {
+    const data = rosterBaseData()
+    data.rosters = [
+      {
+        id: 'r1',
+        name: 'Stale',
+        assignments: {
+          'trk-gruppe': { GF: 'Alice', ZZ: 'Bob', MA: 'Ghost' },
+          'trk-deleted': { GF: 'Bob' },
+        },
+      },
+    ] as DataFile['rosters']
+
+    const engine = new StateEngine(data, { persist: persistSpy, now: () => T0 })
+    const a = engine.rosters[0].assignments
+
+    expect(a['trk-deleted']).toBeUndefined()
+    expect(a['trk-gruppe']['ZZ']).toBeUndefined()
+    expect(a['trk-gruppe']['MA']).toBeNull()
+    expect(a['trk-gruppe']['GF']).toBe('Alice')
+  })
+})
+
+describe('StateEngine — randomAssign invariants', () => {
+  function seededRng(seed: number): () => number {
+    let s = seed
+    return () => {
+      s = (s * 1664525 + 1013904223) % 4294967296
+      return s / 4294967296
+    }
+  }
+
+  function assignedNames(engine: StateEngine, rosterId: string): string[] {
+    const roster = engine.rosters.find((r) => r.id === rosterId)!
+    return Object.values(roster.assignments)
+      .flatMap((slots) => Object.values(slots))
+      .filter((v): v is string => typeof v === 'string')
+  }
+
+  it.each([1, 2, 3, 42, 1234])('never assigns a person twice and terminates (seed %i)', (seed) => {
+    const engine = new StateEngine(rosterBaseData(), {
+      persist: persistSpy,
+      now: () => T0,
+      rng: seededRng(seed),
+    })
+    const roster = engine.createRoster({ name: 'R' })
+    const result = engine.randomAssign(roster.id)
+
+    const names = assignedNames(engine, roster.id)
+    expect(new Set(names).size).toBe(names.length)
+    expect(result.assigned).toBe(names.length)
+    expect([...names, ...result.unassigned].sort()).toEqual(
+      engine.persons.map((p) => p.name).sort(),
+    )
+  })
+
+  it('fills every slot when persons outnumber slots, leaving the rest unassigned', () => {
+    const data = rosterBaseData()
+    const totalSlots = data.trucks.reduce((n, t) => n + CREW_SLOTS[t.category].length, 0)
+    for (let i = 0; i < totalSlots + 3; i++) data.persons.push({ name: `P${i}`, excludedRoles: [] })
+    const engine = new StateEngine(data, { persist: persistSpy, now: () => T0, rng: seededRng(7) })
+    const roster = engine.createRoster({ name: 'R' })
+
+    const result = engine.randomAssign(roster.id)
+
+    expect(result.assigned).toBe(totalSlots)
+    expect(result.unassigned).toHaveLength(data.persons.length - totalSlots)
+  })
+
+  it('leaves persons unassigned when every free role is excluded for them, and terminates', () => {
+    const data = rosterBaseData()
+    const allRoles = [...new Set(Object.values(CREW_SLOTS).flat())]
+    data.persons = [{ name: 'Blocked', excludedRoles: allRoles }, { name: 'Free', excludedRoles: [] }]
+    const engine = new StateEngine(data, { persist: persistSpy, now: () => T0, rng: seededRng(5) })
+    const roster = engine.createRoster({ name: 'R' })
+
+    const result = engine.randomAssign(roster.id)
+
+    expect(result.unassigned).toEqual(['Blocked'])
+    expect(result.assigned).toBe(1)
+  })
+
+  it('is deterministic for a fixed rng seed', () => {
+    const run = () => {
+      const engine = new StateEngine(rosterBaseData(), {
+        persist: persistSpy,
+        now: () => T0,
+        rng: seededRng(99),
+      })
+      const roster = engine.createRoster({ name: 'R' })
+      engine.randomAssign(roster.id)
+      return JSON.stringify(engine.rosters[0].assignments)
+    }
+    expect(run()).toBe(run())
   })
 })

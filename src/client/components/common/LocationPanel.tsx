@@ -20,6 +20,16 @@ const DEFAULT_MAP_ZOOM = 17
 /** Fixed map/hint area height so both branches render at the same size. */
 const MAP_AREA_HEIGHT = 320
 
+/** Visually-hidden styling for the SR-only coordinate readout. */
+const visuallyHidden = {
+  position: 'absolute',
+  width: 1,
+  height: 1,
+  overflow: 'hidden',
+  clip: 'rect(0 0 0 0)',
+  whiteSpace: 'nowrap',
+} as const
+
 /**
  * Location panel for an alert: embeds a Google map derived from the position
  * (when both lat and lng are present) or from the URL-encoded address.
@@ -46,16 +56,25 @@ export function LocationPanel({ address, lat, lng, zoom, stretch = false, center
       }}
     >
       {hasAddress ? (
-        <Box sx={{ height: MAP_AREA_HEIGHT }}>
-          <iframe
-            title={`Karte: ${address.trim()}`}
-            width="100%"
-            height="100%"
-            style={{ border: 0 }}
-            loading="lazy"
-            src={`https://maps.google.com/maps?q=${query}&z=${mapZoom}&output=embed`}
-          />
-        </Box>
+        <>
+          {/* Screen-reader / keyboard users cannot navigate the non-interactive
+              map iframe, so the numeric position is also exposed as text. */}
+          {hasPosition && (
+            <Box component="span" role="status" sx={visuallyHidden}>
+              Einsatzort: {address.trim()}, Position {lat!.toFixed(5)}, {lng!.toFixed(5)}
+            </Box>
+          )}
+          <Box sx={{ height: MAP_AREA_HEIGHT }}>
+            <iframe
+              title={`Karte: ${address.trim()}`}
+              width="100%"
+              height="100%"
+              style={{ border: 0 }}
+              loading="lazy"
+              src={`https://maps.google.com/maps?q=${query}&z=${mapZoom}&output=embed`}
+            />
+          </Box>
+        </>
       ) : (
         <Box
           sx={{

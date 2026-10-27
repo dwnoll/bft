@@ -5,6 +5,7 @@ import CardContent from '@mui/material/CardContent'
 import CardHeader from '@mui/material/CardHeader'
 import TextField from '@mui/material/TextField'
 import { useEffect, useState } from 'react'
+import { DEFAULT_SOUND_DURATION_SEC } from '../../../shared/constants'
 
 export interface SettingsCardProps {
   initialDurationSec: number
@@ -54,7 +55,7 @@ export function SettingsCard({
                 setError(null)
               }}
               error={Boolean(error)}
-              helperText={error || 'Standard: 60 Sekunden. Ton wird während dieser Zeit in Schleife abgespielt.'}
+              helperText={error || `Standard: ${DEFAULT_SOUND_DURATION_SEC} Sekunden. Ton wird während dieser Zeit in Schleife abgespielt.`}
               inputProps={{ min: 1, step: 1 }}
               disabled={loading}
               sx={{ minWidth: 260 }}

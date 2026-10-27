@@ -37,11 +37,11 @@ export function TruckCard({ truck, highlighted, activeRoster }: TruckCardProps) 
         >
           <Box
             component="span"
-            sx={{ fontWeight: 700, display: 'inline-block', width: '3ch', textAlign: 'left' }}
+            sx={{ fontWeight: 700, display: 'inline-block', width: '4ch', textAlign: 'left' }}
           >
             {role}
           </Box>
-          : {personName ?? '-'}
+          {':  '}{personName ?? '-'}
         </Typography>
       )
     })

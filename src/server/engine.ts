@@ -13,9 +13,31 @@ import {
   MIN_LONGITUDE,
   MIN_ZOOM,
   TRUCK_CATEGORIES,
+  slotOccupied,
 } from '../shared/constants'
 
 export const ALARM_ACTIVE_OR_PENDING = 'ALARM_ACTIVE_OR_PENDING'
+
+// --- Persistence-failure handling (reliability) ---
+// A failed disk write must never crash the request/tick that triggered it, but
+// it also must not fail silently: silently losing the last mutation(s) is the
+// actual bug. We classify the failure and surface it prominently. Transient
+// disk hiccups (EAGAIN/ENOSPC) are retried a bounded number of times; anything
+// else (e.g. EACCES) is treated as a fatal condition and escalated loudly.
+const TRANSIENT_PERSIST_CODES = new Set(['EAGAIN', 'ENOSPC'])
+const MAX_PERSIST_RETRIES = 3
+const PERSIST_RETRY_BASE_MS = 100
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function persistErrorKind(err: unknown): 'transient' | 'fatal' | 'unknown' {
+  const code = (err as NodeJS.ErrnoException | undefined)?.code
+  if (code !== undefined && TRANSIENT_PERSIST_CODES.has(code)) return 'transient'
+  if (code !== undefined) return 'fatal' // e.g. EACCES, EIO, EXDEV
+  return 'unknown'
+}
 
 // Typed domain errors. The Express layer maps `code` to HTTP status:
 //   'ALARM_ACTIVE_OR_PENDING' -> 409
@@ -86,6 +108,34 @@ export class StateEngine {
       persons: data.persons ?? [],
       rosters: data.rosters ?? [],
       activeRosterId: data.activeRosterId ?? null,
+    }
+    this.pruneRosters()
+  }
+
+  /**
+   * Drop roster assignments that no longer match the data: entries for deleted
+   * trucks, roles invalid for the truck's category, and person names that are
+   * no longer in the persons list (crew_roster PRD §8). Runs on construction so
+   * a hand-edited or stale data.json is normalized before use.
+   */
+  private pruneRosters(): void {
+    const personNames = new Set(this.data.persons.map((p) => p.name))
+    for (const roster of this.data.rosters) {
+      for (const [truckId, slots] of Object.entries(roster.assignments)) {
+        const truck = this.data.trucks.find((t) => t.id === truckId)
+        if (!truck) {
+          delete roster.assignments[truckId]
+          continue
+        }
+        const validRoles = new Set(CREW_SLOTS[truck.category] ?? [])
+        for (const [role, personName] of Object.entries(slots)) {
+          if (!validRoles.has(role)) {
+            delete slots[role]
+          } else if (personName !== null && !personNames.has(personName)) {
+            slots[role] = null
+          }
+        }
+      }
     }
   }
 
@@ -182,15 +232,60 @@ export class StateEngine {
     return alert
   }
 
+  /** Keep only the string entries of a truckIds value (drops non-string noise). */
+  private normalizeIdArray(value: unknown): string[] {
+    if (!Array.isArray(value)) return []
+    return value.filter((id): id is string => typeof id === 'string')
+  }
+
+  // Last persist failure, surfaced for operators/tests. Null when the most
+  // recent persist succeeded (or none has been attempted yet).
+  private lastPersistError: unknown = null
+
+  get lastPersistFailure(): unknown {
+    return this.lastPersistError
+  }
+
   private schedulePersist(): void {
+    // Fire-and-forget: state is already mutated synchronously. A rejected
+    // persist must never crash the request/tick that triggered it (the storage
+    // layer coalesces concurrent writes into a single disk write), but a
+    // failure must not go silent either — see persistWithRetry.
     try {
-      // Fire-and-forget: state is already mutated synchronously. A rejected
-      // persist must never crash the request/tick that triggered it.
-      void this._options.persist(this.data).catch((err: unknown) => {
-        console.error('Error persisting state:', err)
-      })
+      void this.persistWithRetry(0)
     } catch (err) {
+      this.lastPersistError = err
       console.error('Error scheduling state persist:', err)
+    }
+  }
+
+  /**
+   * Persist with bounded retry for transient disk hiccups (EAGAIN/ENOSPC).
+   * Non-transient failures (e.g. EACCES) are treated as fatal conditions and
+   * escalated loudly rather than retried. A failure never propagates to the
+   * caller — it is recorded on `lastPersistFailure` and logged.
+   */
+  private async persistWithRetry(attempt: number): Promise<void> {
+    try {
+      await this._options.persist(this.data)
+      this.lastPersistError = null
+    } catch (err) {
+      const kind = persistErrorKind(err)
+      if (kind === 'transient' && attempt < MAX_PERSIST_RETRIES) {
+        await sleep(PERSIST_RETRY_BASE_MS * (attempt + 1))
+        return this.persistWithRetry(attempt + 1)
+      }
+      this.lastPersistError = err
+      const detail =
+        kind === 'fatal'
+          ? `non-transient ${((err as NodeJS.ErrnoException).code ?? 'error')}`
+          : kind === 'transient'
+            ? 'still failing after retries'
+            : 'unknown error'
+      console.error(
+        `[persistence] Failed to persist state (${detail}). In-memory state may diverge from durable storage; the last mutation(s) will be lost on restart until the storage issue is resolved.`,
+        err,
+      )
     }
   }
 
@@ -203,12 +298,8 @@ export class StateEngine {
     if (this.falseAlarmActiveSince !== null) {
       return true
     }
-    return this.data.alerts.some(
-      // An alert occupies the slot when it is active, or when it is pending with
-      // an armed trigger. A pending alert without triggerAt does NOT occupy the
-      // slot — this prevents orphaned triggerAt values from permanently blocking.
-      (a) => a.status === 'active' || (a.status === 'pending' && a.triggerAt !== undefined),
-    )
+    // Shared single-source predicate (see shared/constants slotOccupied).
+    return this.data.alerts.some(slotOccupied)
   }
 
   // --- delayed trigger -------------------------------------------------------
@@ -450,9 +541,7 @@ export class StateEngine {
       throw new ValidationError('truckIds must be an array')
     }
 
-    const truckIds: string[] = Array.isArray(input.truckIds)
-      ? input.truckIds.filter((id): id is string => typeof id === 'string')
-      : []
+    const truckIds = this.normalizeIdArray(input.truckIds)
 
     const notes =
       typeof input.notes === 'string' && input.notes.trim().length > 0
@@ -530,7 +619,7 @@ export class StateEngine {
       if (!Array.isArray(input.truckIds)) {
         throw new ValidationError('truckIds must be an array')
       }
-      alert.truckIds = input.truckIds.filter((tid): tid is string => typeof tid === 'string')
+      alert.truckIds = this.normalizeIdArray(input.truckIds)
     }
 
     // Validate the optional position/zoom and only apply when explicitly changed.

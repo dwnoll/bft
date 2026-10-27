@@ -82,6 +82,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             severity={currentToast.severity}
             onClose={() => removeToast(currentToast.id)}
             variant="filled"
+            role="status"
+            aria-live="polite"
             sx={{ width: '100%', minWidth: 280 }}
           >
             {currentToast.message}

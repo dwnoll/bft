@@ -6,8 +6,8 @@ export const TRUCK_CATEGORIES: TruckCategory[] = ['Gruppe', 'Staffel', 'Trupp']
 
 // --- Crew slot lists per truck category (crew_roster PRD §1) ---
 export const CREW_SLOTS: Record<TruckCategory, string[]> = {
-  Gruppe: ['GF', 'MA', 'ME', 'AF', 'AM', 'WF', 'WM', 'SF', 'SM'],
-  Staffel: ['SF', 'MA', 'AF', 'AM', 'WF', 'WM'],
+  Gruppe: ['GF', 'MA', 'ME', 'ATF', 'ATM', 'WTF', 'WTM', 'STF', 'STM'],
+  Staffel: ['SF', 'MA', 'ATF', 'ATM', 'WTF', 'WTM'],
   Trupp: ['MA', 'MF', 'TM'],
 }
 
@@ -20,6 +20,26 @@ export const FALSE_ALARM_MS = AUTO_COMPLETE_MS // false alarm auto-clears after 
 // --- Delayed trigger window (R9) ---
 export const MIN_DELAY_MINUTES = 3
 export const MAX_DELAY_MINUTES = 15
+
+// --- Single-active alarm slot (PRD §1 core rule) ---
+// An alert occupies the one-alarm slot when it is active, or when it is
+// pending with an armed delayed trigger (triggerAt set). A pending alert
+// WITHOUT triggerAt does not occupy the slot — this keeps orphaned triggerAt
+// values from permanently blocking the slot. This is the single source of
+// truth shared by the engine (invariant check) and storage (integrity sweep),
+// so a new slot consumer cannot diverge by reusing a stale copy of the rule.
+export function isArmed(alert: Alert): boolean {
+  return alert.status === 'pending' && alert.triggerAt !== undefined
+}
+
+export function slotOccupied(alert: Alert): boolean {
+  return alert.status === 'active' || isArmed(alert)
+}
+
+// --- Sound (PRD §9) ---
+// Canonical default duration (seconds) the alarm sound plays. Referenced by the
+// seed, the client fallbacks, and the settings UI copy so it cannot drift.
+export const DEFAULT_SOUND_DURATION_SEC = 60
 
 // --- Location / map view (PRD §2, §6, §11) ---
 // Zoom axis rendered as a slider; the four visible stops are labelled with the
@@ -93,7 +113,7 @@ export function seedAlerts(trucks: Truck[]): Alert[] {
 }
 
 export function seedSettings(): Settings {
-  return { soundDurationSec: 60 }
+  return { soundDurationSec: DEFAULT_SOUND_DURATION_SEC }
 }
 
 export function seedPersons(): Person[] {

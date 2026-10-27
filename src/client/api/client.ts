@@ -48,11 +48,21 @@ export interface UpdateRosterInput {
   assignments?: Roster['assignments']
 }
 
+/**
+ * Error raised for any non-2xx API response.
+ *
+ * `status` is the HTTP status; `message` is the human-readable `error` field
+ * from the response body (falls back to `HTTP <status>` for non-JSON bodies);
+ * `data` is the parsed response body; `code` is the optional domain error code
+ * the server attaches to 4xx responses (e.g. `ALARM_ACTIVE_OR_PENDING`,
+ * `NOT_FOUND`). Callers can branch on `code` without re-parsing `data`.
+ */
 export class ApiError extends Error {
   constructor(
     public status: number,
     message: string,
     public data?: unknown,
+    public code?: string,
   ) {
     super(message)
     this.name = 'ApiError'
@@ -114,16 +124,20 @@ class ApiClient {
     if (!res.ok) {
       let errorMessage = `HTTP ${res.status}`
       let data: unknown = undefined
+      let code: string | undefined
       try {
         const json = await res.json()
         data = json
         if (json && typeof json.error === 'string') {
           errorMessage = json.error
         }
+        if (json && typeof json.code === 'string') {
+          code = json.code
+        }
       } catch {
         // Non-JSON response
       }
-      throw new ApiError(res.status, errorMessage, data)
+      throw new ApiError(res.status, errorMessage, data, code)
     }
 
     if (res.status === 204) {
@@ -249,8 +263,8 @@ class ApiClient {
     })
   }
 
-  public async deleteRoster(id: string): Promise<void> {
-    return this.request<void>(`/api/rosters/${encodeURIComponent(id)}`, {
+  public async deleteRoster(id: string): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>(`/api/rosters/${encodeURIComponent(id)}`, {
       method: 'DELETE',
     })
   }

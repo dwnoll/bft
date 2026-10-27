@@ -41,9 +41,13 @@ describe('LocationPanel', () => {
     expect(getMapSrc()).toBe('https://maps.google.com/maps?q=Musterstra%C3%9Fe%205&z=17&output=embed')
   })
 
-  it('keeps the title and zoom hint above the map', () => {
-    render(<LocationPanel title="Einsatzort" address='Musterstraße 5' lat={null} lng={null} zoom={16} />)
-    expect(screen.getByText(/Einsatzort/)).toBeInTheDocument()
-    expect(screen.getByText(/Zoom: stark/)).toBeInTheDocument()
+  it('exposes the numeric position as screen-reader text when lat/lng are set', () => {
+    render(<LocationPanel title="Einsatzort" address='Musterstraße 5' lat={52.52} lng={13.405} zoom={17} />)
+    expect(screen.getByRole('status')).toHaveTextContent('Musterstraße 5, Position 52.52000, 13.40500')
+  })
+
+  it('renders no coordinate readout without a full position', () => {
+    render(<LocationPanel title="Einsatzort" address='Musterstraße 5' lat={52.5} lng={null} zoom={17} />)
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
 })

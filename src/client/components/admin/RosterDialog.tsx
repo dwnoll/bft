@@ -1,6 +1,7 @@
 import {
   DndContext,
   DragOverlay,
+  KeyboardSensor,
   PointerSensor,
   TouchSensor,
   useSensor,
@@ -24,6 +25,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Person, Roster, Truck } from '../../../shared/types'
 import { CREW_SLOTS } from '../../../shared/constants'
 import { apiClient } from '../../api/client'
+import { errorMessage } from '../../api/apiError'
 import { ConfirmDialog } from '../common/ConfirmDialog'
 import { useToast } from '../common/ToastContainer'
 
@@ -47,8 +49,8 @@ const POOL_DROP_ID = 'pool:__pool__'
 function decodeId(id: string): { type: 'slot'; truckId: string; role: string } | { type: 'pool'; name: string } | null {
   if (id.startsWith('slot:')) {
     const parts = id.slice(5).split(':')
-    if (parts.length < 2) return null
     const role = parts[parts.length - 1]
+    if (parts.length < 2 || role === undefined) return null
     const truckId = parts.slice(0, -1).join(':')
     return { type: 'slot', truckId, role }
   }
@@ -106,6 +108,7 @@ function DraggablePerson({ id, personName, testId }: DraggablePersonProps) {
       {...attributes}
       {...listeners}
       data-testid={testId}
+      aria-label={personName}
       sx={{
         display: 'inline-flex',
         cursor: 'grab',
@@ -132,6 +135,8 @@ function PoolDropZone({ isOver, children }: PoolDropZoneProps) {
     <Box
       ref={setNodeRef}
       data-testid="unassigned-pool"
+      role="group"
+      aria-label="Nicht zugewiesene Personen"
       sx={{
         display: 'flex',
         flexWrap: 'wrap',
@@ -164,6 +169,8 @@ function SlotCell({ truckId, role, personName, isDraggingOver }: SlotCellProps) 
     <Box
       ref={setNodeRef}
       data-testid={`slot-${truckId}-${role}`}
+      role="group"
+      aria-label={`${role}: ${personName ?? 'leer'}`}
       sx={{
         display: 'flex',
         alignItems: 'center',
@@ -236,6 +243,9 @@ export function RosterDialog({ open, roster, persons, trucks, onClose }: RosterD
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
+    // Keyboard path (a11y): Tab to a person chip, Space/Enter to pick up,
+    // arrow keys to move over a slot or the pool, Space/Enter to drop, Esc to cancel.
+    useSensor(KeyboardSensor),
   )
 
   // Derive unassigned persons
@@ -269,7 +279,6 @@ export function RosterDialog({ open, roster, persons, trucks, onClose }: RosterD
     [],
   )
 
-  // DnD handlers
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(String(event.active.id))
   }
@@ -362,7 +371,7 @@ export function RosterDialog({ open, roster, persons, trucks, onClose }: RosterD
       }
       onClose(true)
     } catch (err) {
-      showError(err instanceof Error ? err.message : 'Fehler beim Speichern')
+      showError(errorMessage(err, 'Fehler beim Speichern'))
     } finally {
       setSaving(false)
     }
@@ -376,7 +385,7 @@ export function RosterDialog({ open, roster, persons, trucks, onClose }: RosterD
         await apiClient.deleteRoster(savedRosterIdRef.current)
         onClose(true)
       } catch (err) {
-        showError(err instanceof Error ? err.message : 'Fehler beim Löschen')
+        showError(errorMessage(err, 'Fehler beim Löschen'))
         onClose(false)
       }
       return
@@ -419,7 +428,7 @@ export function RosterDialog({ open, roster, persons, trucks, onClose }: RosterD
         showSuccess(`Zufällig belegt: ${result.assigned} von ${persons.length} Personen`)
       }
     } catch (err) {
-      showError(err instanceof Error ? err.message : 'Fehler bei der Zufallsbelegung')
+      showError(errorMessage(err, 'Fehler bei der Zufallsbelegung'))
     } finally {
       setRandomLoading(false)
     }

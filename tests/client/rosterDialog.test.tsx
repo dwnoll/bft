@@ -492,3 +492,42 @@ describe('RosterDialog — drag and drop', () => {
     expect(screen.getByTestId('pool-person-Alice')).toBeInTheDocument()
   })
 })
+
+describe('RosterDialog — keyboard accessibility', () => {
+  let restoreRects: (() => void) | undefined
+
+  afterEach(() => {
+    restoreRects?.()
+    restoreRects = undefined
+    vi.restoreAllMocks()
+  })
+
+  it('exposes focusable, labelled draggables and labelled slot/pool groups', () => {
+    renderDndDialog(existingRoster)
+
+    const chip = screen.getByTestId('draggable-slot-trk-gruppe-GF')
+    expect(chip).toHaveAttribute('tabindex', '0')
+    expect(chip).toHaveAttribute('aria-label', 'Alice')
+    expect(screen.getByRole('group', { name: 'GF: Alice' })).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'MA: leer' })).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'Nicht zugewiesene Personen' })).toBeInTheDocument()
+  })
+
+  it('moves a person from the pool to a slot using only the keyboard', async () => {
+    renderDndDialog(null)
+    restoreRects = mockRectsFor('slot-trk-gruppe-MA')
+
+    const chip = screen.getByTestId('pool-person-Alice')
+    chip.focus()
+    fireEvent.keyDown(chip, { code: 'Space', key: ' ' })
+    // KeyboardSensor registers its document listeners on the next tick.
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    // KeyboardSensor moves the overlay in 25px steps; 4 right + 4 down => (100,100)
+    for (let i = 0; i < 4; i++) fireEvent.keyDown(document, { code: 'ArrowRight', key: 'ArrowRight' })
+    for (let i = 0; i < 4; i++) fireEvent.keyDown(document, { code: 'ArrowDown', key: 'ArrowDown' })
+    fireEvent.keyDown(document, { code: 'Space', key: ' ' })
+
+    expect(screen.getByTestId('slot-trk-gruppe-MA')).toHaveTextContent('Alice')
+    expect(screen.queryByTestId('pool-person-Alice')).not.toBeInTheDocument()
+  })
+})

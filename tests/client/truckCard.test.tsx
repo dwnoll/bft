@@ -13,7 +13,7 @@ describe('TruckCard — crew slot rendering', () => {
     // Gruppe slots: GF MA ME AF AM WF WM SF SM
     const slots = screen.getAllByTestId(/^crew-slot-/)
     expect(slots).toHaveLength(9)
-    slots.forEach((slot) => expect(slot.textContent).toMatch(/: -$/))
+    slots.forEach((slot) => expect(slot.textContent).toMatch(/:  -$/))
   })
 
   it('shows all Staffel slots (6 slots)', () => {
@@ -37,21 +37,21 @@ describe('TruckCard — crew slot rendering', () => {
     }
     render(<TruckCard truck={gruppeTruck} highlighted={false} activeRoster={activeRoster} />)
     const gfSlot = screen.getByTestId('crew-slot-GF')
-    expect(gfSlot.textContent).toBe('GF: Berger Anna')
+    expect(gfSlot.textContent).toBe('GF:  Berger Anna')
     const maSlot = screen.getByTestId('crew-slot-MA')
-    expect(maSlot.textContent).toBe('MA: -')
+    expect(maSlot.textContent).toBe('MA:  -')
   })
 
   it('renders "-" for all slots of an unassigned truck even with an active roster', () => {
     const activeRoster: ActiveRosterSummary = {
       name: 'Other Roster',
       assignments: {
-        'other-truck': { GF: 'Someone' },
+        'other-truck': { GF:  'Someone' },
       },
     }
     render(<TruckCard truck={gruppeTruck} highlighted={false} activeRoster={activeRoster} />)
     const slots = screen.getAllByTestId(/^crew-slot-/)
-    slots.forEach((slot) => expect(slot.textContent).toMatch(/: -$/))
+    slots.forEach((slot) => expect(slot.textContent).toMatch(/:  -$/))
   })
 
   it('renders "Alarmiert" chip only when highlighted', () => {
