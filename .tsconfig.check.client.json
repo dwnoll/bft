@@ -1,0 +1,7 @@
+{
+  "extends": "./tsconfig.client.json",
+  "compilerOptions": {
+    "noUncheckedIndexedAccess": true
+  },
+  "include": ["src/client/**/*", "src/shared/**/*"]
+}

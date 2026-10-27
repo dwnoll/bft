@@ -32,10 +32,11 @@ export function createRostersRouter(engine: StateEngine): Router {
   })
 
   // DELETE /api/rosters/:id — delete roster (crew_roster PRD §6)
+  // Returns 200 { success: true } to match the trucks/alerts DELETE convention.
   router.delete('/rosters/:id', (req, res, next) => {
     try {
       engine.deleteRoster(req.params.id)
-      res.status(204).end()
+      res.json({ success: true })
     } catch (err) {
       next(err)
     }

@@ -30,6 +30,9 @@ Alert {
   info: string
   notes?: string
   truckIds: string[]
+  lat?: number | null     // optional map position, -90..90
+  lng?: number | null     // optional map position, -180..180
+  zoom?: number           // map zoom, integer 14..17 (default 15)
   status: 'pending' | 'active' | 'complete'
   triggerAt?: number      // epoch ms, set when a delayed trigger is armed
   activeSince?: number    // epoch ms, set when the alert goes active
@@ -40,12 +43,32 @@ Settings {
   soundDurationSec: number   // default 60
 }
 
+Person {
+  name: string               // identity key, unique
+  excludedRoles: string[]    // crew roles this person must never be assigned to
+}
+
+Roster {
+  id: string
+  name: string
+  assignments: { [truckId: string]: { [role: string]: string | null } }
+                             // role -> person name; roles per truck category
+}
+
 DataFile {
   trucks: Truck[]
   alerts: Alert[]
   settings: Settings
+  persons: Person[]
+  rosters: Roster[]
+  activeRosterId: string | null   // at most one roster is active
 }
 ```
+
+Crew roles per category (`CREW_SLOTS` in `src/shared/constants.ts`):
+`Gruppe` GF, MA, ME, AF, AM, WF, WM, SF, SM · `Staffel` SF, MA, AF, AM, WF, WM ·
+`Trupp` MA, MF, TM. On load the engine prunes roster entries for deleted
+trucks, roles invalid for the truck's category, and unknown person names.
 
 Timers survive server restarts: state is derived from the persisted timestamps
 (`triggerAt`, `activeSince`) by a tick loop that runs every second and also on
@@ -138,6 +161,15 @@ startup.
 | `POST /api/alerts/:id/complete`                        | basic  | complete active alert                                                     |
 | `POST /api/false-alert`                                | basic  | trigger one-shot false alert                                              |
 | `PATCH /api/settings`                                  | basic  | update `soundDurationSec`                                                 |
+| `GET /api/persons`                                     | basic  | list persons (crew candidates)                                            |
+| `GET/POST /api/rosters`, `PATCH/DELETE /api/rosters/:id` | basic | roster CRUD (DELETE → `200 {success:true}`)                              |
+| `POST /api/rosters/:id/activate`, `POST /api/rosters/deactivate` | basic | set / clear the single active roster                            |
+| `POST /api/rosters/:id/random-assign`                  | basic  | randomly fill slots respecting `excludedRoles`; returns `{roster, assigned, unassigned}` |
+
+`POST/PATCH /api/alerts` additionally accept `lat`, `lng`, `zoom`. `GET /api/state`
+also returns `pendingTrigger` and `activeRoster` (`{name, assignments}`).
+Domain errors respond `{ error, code }` with 400 / 404 / 409; request bodies
+above 256 kB yield `413`.
 
 ## 11. Seed Data
 
@@ -173,7 +205,12 @@ startup.
   - only-one-active/pending enforcement
   - false-alert rejection while active/pending
   - pending trigger cancellation on alert deletion
-- No browser-level tests.
+- jsdom component/hook tests (`tests/client/`) cover the dashboard, admin
+  managers, roster dialog (pointer and keyboard drag-and-drop), toasts and the
+  location panel. No real-browser (E2E) tests.
+- Server tests cover persistence failure handling, corrupt `data.json`
+  recovery, graceful shutdown, body-size limit and the single-slot invariant
+  under concurrent requests.
 
 ## 15. Out of Scope
 

@@ -656,18 +656,19 @@ describe('Crew Roster API', () => {
   })
 
   describe('DELETE /api/rosters/:id', () => {
-    it('deletes a roster and returns 204', async () => {
+    it('deletes a roster and returns 200 { success: true }', async () => {
       const create = await api('/api/rosters', {
         method: 'POST',
         headers: { Authorization: authHeader, 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: 'ToDelete' }),
       })
       const roster = create.body as { id: string }
-      const { status } = await api(`/api/rosters/${roster.id}`, {
+      const { status, body } = await api(`/api/rosters/${roster.id}`, {
         method: 'DELETE',
         headers: { Authorization: authHeader },
       })
-      expect(status).toBe(204)
+      expect(status).toBe(200)
+      expect(body).toEqual({ success: true })
     })
 
     it('returns 404 for unknown id', async () => {

@@ -50,7 +50,13 @@ graph TD
 - **Persistence Layer (`src/server/storage.ts`)**: Manages reading and atomic
   writing of `data.json`. On initial startup, if `data.json` is missing, it
   creates the file initialized with seed data (5 trucks, 2 pending alerts,
-  default settings).
+  default settings). `load()` validates structure, rejects duplicate person
+  names and clears orphaned `triggerAt`; it contains no roster business rules.
+  `flush()` resolves once queued writes finish (used on shutdown).
+- **Bootstrap resilience (`startServer`)**: a corrupt/unreadable `data.json` is
+  renamed to `data.json.corrupt-<ts>` and the app re-seeds instead of failing
+  boot. Tick errors are caught and logged. SIGINT/SIGTERM clear the tick
+  timer, close the server and flush pending writes before exit.
 - **State & Lifecycle Engine (`src/server/engine.ts`)**:
   - Implements the pure domain state machine and tick loop (runs every second
     and on startup).
@@ -59,6 +65,13 @@ graph TD
   - Manages the single-active-alarm invariant (only one alert may be active or
     pending system-wide).
   - Handles false alerts (one-shot, in-memory active window, clears after 10m).
+  - Uses the shared `slotOccupied()` / `isArmed()` predicates
+    (`src/shared/constants.ts`) for the single-slot invariant.
+  - Crew rosters: CRUD, single active roster, `randomAssign`; normalizes
+    persisted rosters (deleted trucks, invalid roles, unknown persons) on
+    construction.
+  - Persistence is fire-and-forget with bounded retry for transient errors
+    (EAGAIN/ENOSPC); failures are logged and exposed via `lastPersistFailure`.
   - Manages cascading updates (e.g. deleting a truck silently cleans up
     references in `truckIds`).
 - **Authentication Middleware (`src/server/middleware/auth.ts`)**: Enforces HTTP
@@ -72,6 +85,11 @@ graph TD
     `/cancel-trigger`, `/complete`).
   - `falseAlert.ts`: Protected `POST /api/false-alert` endpoint.
   - `settings.ts`: Protected `PATCH /api/settings` endpoint for sound duration.
+  - `persons.ts`: Protected `GET /api/persons`.
+  - `rosters.ts`: Protected roster CRUD (`DELETE` → `200 {success:true}`),
+    `activate`, `deactivate` and `random-assign`.
+  - Body parser limit is 256 kB (oversized → `413`); errors return
+    `{ error, code }`, which the client surfaces on `ApiError.code`.
 
 ### 2.2 Frontend (React + MUI + TypeScript)
 
@@ -105,6 +123,15 @@ graph TD
   - `CountdownBadge.tsx`: Live countdown display with Cancel button for armed
     triggers.
   - `SettingsCard.tsx`: Configuration for alarm sound duration.
+  - `RosterManager.tsx` / `RosterDialog.tsx`: crew roster list and editor.
+    Assignment works via drag-and-drop (pointer, touch) and keyboard
+    (`KeyboardSensor`: Space/Enter to lift, arrows to move, Space/Enter to
+    drop, Esc to cancel); slots and the pool are labelled groups.
+  - `AlertFormDialog.tsx`; `common/LocationPanel.tsx` embeds a map and exposes
+    the position as visually-hidden `role="status"` text for screen readers.
+  - `common/ToastContainer.tsx`: toasts use `role="status"` / `aria-live="polite"`.
+  - `api/apiError.ts`: `errorMessage()` maps server error `code`s to German
+    labels.
 
 ---
 
@@ -115,6 +142,10 @@ erDiagram
     DataFile ||--o{ Truck : contains
     DataFile ||--o{ Alert : contains
     DataFile ||--|| Settings : contains
+    DataFile ||--o{ Person : contains
+    DataFile ||--o{ Roster : contains
+    Roster }o--o{ Person : "assigns by name"
+    Roster }o--o{ Truck : "slots per truck"
 
     Truck {
         string id PK "Short ULID / UUID"
@@ -130,6 +161,9 @@ erDiagram
         string info "e.g. Brandgeruch in Wohneinheit"
         string notes "Optional notes"
         string[] truckIds "Referenced Truck IDs"
+        number lat "Optional, -90..90"
+        number lng "Optional, -180..180"
+        number zoom "14..17, default 15"
         string status "pending | active | complete"
         number triggerAt "Epoch ms for delayed arm"
         number activeSince "Epoch ms when fired"
@@ -138,6 +172,17 @@ erDiagram
 
     Settings {
         number soundDurationSec "Default: 60"
+    }
+
+    Person {
+        string name PK "Unique identity key"
+        string[] excludedRoles "Roles never assignable"
+    }
+
+    Roster {
+        string id PK
+        string name
+        object assignments "truckId -> role -> person name or null"
     }
 ```
 

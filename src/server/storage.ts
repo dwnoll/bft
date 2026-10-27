@@ -1,7 +1,7 @@
 import { rename, readFile, writeFile, mkdir, unlink } from 'node:fs/promises'
 import path from 'node:path'
 import { ulid } from 'ulid'
-import { CREW_SLOTS, defaultDataFile } from '../shared/constants'
+import { defaultDataFile, isArmed } from '../shared/constants'
 import type { DataFile } from '../shared/types'
 
 // In-process serialization of writes so overlapping save calls cannot
@@ -32,6 +32,15 @@ export async function save(dataFile: string, data: DataFile): Promise<void> {
   }, undefined)
   saveChain = step.catch(() => undefined)
   return step
+}
+
+/**
+ * Resolves once every save() enqueued so far has completed (or failed). Used by
+ * the graceful-shutdown path to perform a final flush before the process exits,
+ * so an in-flight fire-and-forget write is not lost.
+ */
+export function flush(): Promise<void> {
+  return saveChain
 }
 
 async function doWrite(dataFile: string, data: DataFile): Promise<void> {
@@ -103,37 +112,17 @@ export async function load(dataFile: string): Promise<DataFile> {
     personNames.add(p.name)
   }
 
-  // Data integrity sweep: clear any orphaned triggerAt on non-pending alerts.
-  // This prevents ghost slot lockout from partial writes or crashes (R3).
+  // Data integrity sweep: clear any orphaned triggerAt on alerts that are not
+  // armed (shared single-source predicate, see shared/constants). This prevents
+  // ghost slot lockout from partial writes or crashes (R3).
   for (const alert of data.alerts) {
-    if (alert.status !== 'pending' && alert.triggerAt !== undefined) {
+    if (alert.triggerAt !== undefined && !isArmed(alert)) {
       alert.triggerAt = undefined
     }
   }
 
-  // Prune orphaned slot values (person name no longer in persons list) and
-  // unknown roles for the truck's current category (crew_roster PRD §8).
-  for (const roster of data.rosters) {
-    for (const [truckId, slots] of Object.entries(roster.assignments)) {
-      const truck = data.trucks.find((t) => t.id === truckId)
-      if (!truck) {
-        // Truck deleted — remove the entry entirely
-        delete roster.assignments[truckId]
-        continue
-      }
-      const validRoles = new Set(CREW_SLOTS[truck.category] ?? [])
-      for (const [role, personName] of Object.entries(slots)) {
-        if (!validRoles.has(role)) {
-          // Role no longer valid for this category
-          delete slots[role]
-        } else if (personName !== null && !personNames.has(personName)) {
-          // Orphaned person name — prune to null
-          slots[role] = null
-        }
-      }
-    }
-  }
-
+  // Roster normalization (orphaned persons/roles/trucks) is a business rule and
+  // lives in the StateEngine constructor, not in the persistence layer.
   return data
 }
 

@@ -20,6 +20,7 @@ import { useState } from 'react'
 import type { Truck, TruckCategory } from '../../../shared/types'
 import { TRUCK_CATEGORIES } from '../../../shared/constants'
 import { apiClient } from '../../api/client'
+import { errorMessage } from '../../api/apiError'
 import { ConfirmDialog } from '../common/ConfirmDialog'
 import { useToast } from '../common/ToastContainer'
 
@@ -85,7 +86,7 @@ export function TruckManager({ trucks, onRefresh, loading = false }: TruckManage
       setFormOpen(false)
       await onRefresh()
     } catch (err) {
-      showError(err instanceof Error ? err.message : 'Fehler beim Speichern des Fahrzeugs')
+      showError(errorMessage(err, 'Fehler beim Speichern des Fahrzeugs'))
     } finally {
       setSubmitting(false)
     }
@@ -100,7 +101,7 @@ export function TruckManager({ trucks, onRefresh, loading = false }: TruckManage
       setDeleteTarget(null)
       await onRefresh()
     } catch (err) {
-      showError(err instanceof Error ? err.message : 'Fehler beim Löschen des Fahrzeugs')
+      showError(errorMessage(err, 'Fehler beim Löschen des Fahrzeugs'))
     } finally {
       setDeleting(false)
     }

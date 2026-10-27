@@ -11,7 +11,9 @@ import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Alert as AlertType, Person, Roster, Settings, Truck } from '../../../shared/types'
+import { DEFAULT_SOUND_DURATION_SEC } from '../../../shared/constants'
 import { apiClient } from '../../api/client'
+import { errorMessage } from '../../api/apiError'
 import { useAppState } from '../../hooks/useAppState'
 import { COLOR_EMERGENCY } from '../../theme'
 import { ConfirmDialog } from '../common/ConfirmDialog'
@@ -54,7 +56,7 @@ export function AdminLayout({
   // Admin Data State
   const [trucks, setTrucks] = useState<Truck[]>([])
   const [alerts, setAlerts] = useState<AlertType[]>([])
-  const [settings, setSettings] = useState<Settings>({ soundDurationSec: 60 })
+  const [settings, setSettings] = useState<Settings>({ soundDurationSec: DEFAULT_SOUND_DURATION_SEC })
   const [persons, setPersons] = useState<Person[]>([])
   const [rosters, setRosters] = useState<Roster[]>([])
   const [activeRosterId, setActiveRosterId] = useState<string | null>(null)
@@ -161,7 +163,7 @@ export function AdminLayout({
       setFalseAlarmDialogOpen(false)
       await loadData()
     } catch (err) {
-      showError(err instanceof Error ? err.message : 'Fehler beim Auslösen des Fehlalarms')
+      showError(errorMessage(err, 'Fehler beim Auslösen des Fehlalarms'))
     } finally {
       setTriggeringFalseAlarm(false)
     }
@@ -174,7 +176,7 @@ export function AdminLayout({
       showSuccess('Fehlalarm abgebrochen')
       setFalseAlarmDialogOpen(false)
     } catch (err) {
-      showError(err instanceof Error ? err.message : 'Fehler beim Abbrechen des Fehlalarms')
+      showError(errorMessage(err, 'Fehler beim Abbrechen des Fehlalarms'))
     } finally {
       setCancelingFalseAlarm(false)
     }
@@ -188,7 +190,7 @@ export function AdminLayout({
       showSuccess('Einstellungen gespeichert')
       await loadData()
     } catch (err) {
-      showError(err instanceof Error ? err.message : 'Fehler beim Speichern der Einstellungen')
+      showError(errorMessage(err, 'Fehler beim Speichern der Einstellungen'))
     } finally {
       setSavingSettings(false)
     }

@@ -63,14 +63,34 @@ describe('ApiClient', () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: false,
       status: 409,
-      json: async () => ({ error: 'Alarm aktiv oder ausstehend' }),
+      json: async () => ({
+        error: 'Alarm aktiv oder ausstehend',
+        code: 'ALARM_ACTIVE_OR_PENDING',
+      }),
     })
     global.fetch = mockFetch
 
+    await expect(apiClient.triggerAlert('123', 5)).rejects.toThrow(ApiError)
     await expect(apiClient.triggerAlert('123', 5)).rejects.toMatchObject({
       status: 409,
       message: 'Alarm aktiv oder ausstehend',
+      code: 'ALARM_ACTIVE_OR_PENDING',
     })
+  })
+
+  it('surfaces the server domain error `code` on ApiError (api-contract)', async () => {
+    apiClient.setCredentials('ffw_bft', 'bft_2026')
+
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 404,
+      json: async () => ({ error: 'Not found', code: 'NOT_FOUND' }),
+    })
+    global.fetch = mockFetch
+
+    const err = await apiClient.getTrucks().catch((e) => e as ApiError)
+    expect(err).toBeInstanceOf(ApiError)
+    expect(err.code).toBe('NOT_FOUND')
   })
 
   it('supports all truck, alert, settings, and false alert endpoints', async () => {

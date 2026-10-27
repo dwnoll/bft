@@ -16,6 +16,7 @@ import EditIcon from '@mui/icons-material/Edit'
 import { useState } from 'react'
 import type { Person, Roster, Truck } from '../../../shared/types'
 import { apiClient } from '../../api/client'
+import { errorMessage } from '../../api/apiError'
 import { ConfirmDialog } from '../common/ConfirmDialog'
 import { useToast } from '../common/ToastContainer'
 import { RosterDialog } from './RosterDialog'
@@ -75,7 +76,7 @@ export function RosterManager({
       showSuccess(`Besatzung "${roster.name}" aktiviert`)
       await onRefresh()
     } catch (err) {
-      showError(err instanceof Error ? err.message : 'Fehler beim Aktivieren')
+      showError(errorMessage(err, 'Fehler beim Aktivieren'))
     }
   }
 
@@ -85,7 +86,7 @@ export function RosterManager({
       showSuccess('Besatzung deaktiviert')
       await onRefresh()
     } catch (err) {
-      showError(err instanceof Error ? err.message : 'Fehler beim Deaktivieren')
+      showError(errorMessage(err, 'Fehler beim Deaktivieren'))
     }
   }
 
@@ -98,7 +99,7 @@ export function RosterManager({
       setDeleteTarget(null)
       await onRefresh()
     } catch (err) {
-      showError(err instanceof Error ? err.message : 'Fehler beim Löschen')
+      showError(errorMessage(err, 'Fehler beim Löschen'))
     } finally {
       setDeleting(false)
     }
@@ -107,7 +108,7 @@ export function RosterManager({
   return (
     <Card variant="outlined">
       <CardHeader
-        title="Fahreug-Besatzungen"
+        title="Fahrzeug-Besatzungen"
         subheader="Besatzungen anlegen, zuweisen und aktivieren"
         action={
           <Button variant="contained" onClick={handleCreate} sx={{ fontWeight: 700 }}>

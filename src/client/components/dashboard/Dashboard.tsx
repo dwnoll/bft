@@ -5,6 +5,7 @@ import Paper from '@mui/material/Paper'
 import Typography from '@mui/material/Typography'
 import { useMemo } from 'react'
 import type { PublicState } from '../../../shared/types'
+import { DEFAULT_SOUND_DURATION_SEC } from '../../../shared/constants'
 import { useAlarmSound } from '../../hooks/useAlarmSound'
 import { useAppState } from '../../hooks/useAppState'
 import { COLOR_EMERGENCY } from '../../theme'
@@ -39,7 +40,7 @@ export function Dashboard() {
   const activeAlert = state?.activeAlert ?? null
   const falseAlarm = state?.falseAlarmActive === true
   const soundKey = activeAlert ? activeAlert.id : falseAlarm ? FALSE_ALARM_SOUND_KEY : null
-  const { enabled, setEnabled } = useAlarmSound(soundKey, state?.settings.soundDurationSec ?? 60)
+  const { enabled, setEnabled } = useAlarmSound(soundKey, state?.settings.soundDurationSec ?? DEFAULT_SOUND_DURATION_SEC)
 
   const highlightedIds = useMemo(
     () => new Set(activeAlert?.truckIds ?? []),
