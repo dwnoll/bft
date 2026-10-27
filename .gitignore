@@ -6,3 +6,6 @@ data.json.tmp.*
 coverage/
 
 .DS_Store
+
+bft-server.crt
+bft-server.key

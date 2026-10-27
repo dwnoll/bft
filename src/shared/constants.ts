@@ -6,8 +6,8 @@ export const TRUCK_CATEGORIES: TruckCategory[] = ['Gruppe', 'Staffel', 'Trupp']
 
 // --- Crew slot lists per truck category (crew_roster PRD §1) ---
 export const CREW_SLOTS: Record<TruckCategory, string[]> = {
-  Gruppe: ['GF', 'MA', 'ME', 'AF', 'AM', 'WF', 'WM', 'SF', 'SM'],
-  Staffel: ['SF', 'MA', 'AF', 'AM', 'WF', 'WM'],
+  Gruppe: ['GF', 'MA', 'ME', 'ATF', 'ATM', 'WTF', 'WTM', 'STF', 'STM'],
+  Staffel: ['SF', 'MA', 'ATF', 'ATM', 'WTF', 'WTM'],
   Trupp: ['MA', 'MF', 'TM'],
 }
 
